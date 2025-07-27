@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 
+package-lock.json
 # Environment variables
 .env
 .env.*   # optional: ignore all env variants like .env.local, .env.test
