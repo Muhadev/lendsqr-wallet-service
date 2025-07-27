@@ -212,26 +212,65 @@ curl -X POST http://localhost:3000/api/wallet/transfer \
 
 ## Project Structure
 ```
-src/
-├── controllers/        # HTTP request handlers
-├── services/          # Business logic
-├── repositories/      # Data access layer
-├── models/           # Database models
-├── middleware/       # Custom middleware
-├── utils/            # Utility functions
-├── types/            # TypeScript interfaces
-├── config/           # Configuration files
-├── migrations/       # Database migrations
-├── seeds/            # Database seeders
-└── tests/            # Test files
-
-database/
-├── migrations/       # Knex migrations
-└── seeds/           # Knex seeds
-
-docs/
-├── api.md           # API documentation
-└── deployment.md    # Deployment guide
+lendsqr-wallet-service/
+├── src/
+│   ├── app.ts                 # Main application entry point
+│   ├── config/
+│   │   ├── database.ts        # Database configuration
+│   │   ├── logger.ts          # Winston logger configuration
+│   │   └── index.ts           # Export all configurations
+│   ├── controllers/
+│   │   ├── auth.controller.ts # Authentication controller
+│   │   ├── user.controller.ts # User management controller
+│   │   └── wallet.controller.ts # Wallet operations controller
+│   ├── services/
+│   │   ├── auth.service.ts    # Authentication business logic
+│   │   ├── user.service.ts    # User management business logic
+│   │   ├── wallet.service.ts  # Wallet operations business logic
+│   │   └── external.service.ts # External API integration
+│   ├── models/
+│   │   ├── user.model.ts      # User data model
+│   │   ├── wallet.model.ts    # Wallet data model
+│   │   └── transaction.model.ts # Transaction data model
+│   ├── middleware/
+│   │   ├── auth.middleware.ts # JWT authentication middleware
+│   │   ├── validation.middleware.ts # Request validation
+│   │   ├── error.middleware.ts # Error handling middleware
+│   │   └── rateLimiter.middleware.ts # Rate limiting
+│   ├── routes/
+│   │   ├── auth.routes.ts     # Authentication routes
+│   │   ├── user.routes.ts     # User management routes
+│   │   ├── wallet.routes.ts   # Wallet operation routes
+│   │   └── index.ts           # Route aggregator
+│   ├── database/
+│   │   ├── migrations/        # Database migration files
+│   │   └── seeds/             # Database seed files
+│   ├── utils/
+│   │   ├── validators.ts      # Joi validation schemas
+│   │   ├── helpers.ts         # Utility functions
+│   │   └── constants.ts       # Application constants
+│   ├── types/
+│   │   ├── user.types.ts      # User type definitions
+│   │   ├── wallet.types.ts    # Wallet type definitions
+│   │   └── common.types.ts    # Common type definitions
+│   └── tests/
+│       ├── setup.ts           # Test setup configuration
+│       ├── auth.test.ts       # Authentication tests
+│       ├── user.test.ts       # User service tests
+│       └── wallet.test.ts     # Wallet service tests
+├── dist/                      # Compiled JavaScript output
+├── coverage/                  # Test coverage reports
+├── node_modules/             # Dependencies
+├── package.json              # Project configuration
+├── tsconfig.json             # TypeScript configuration
+├── jest.config.js            # Jest testing configuration
+├── knexfile.js               # Knex database configuration
+├── .eslintrc.js              # ESLint configuration
+├── .prettierrc               # Prettier configuration
+├── .env                      # Environment variables
+├── .env.example              # Environment variables template
+├── .gitignore                # Git ignore rules
+└── README.md                 # Project documentation
 ```
 
 ## Error Codes & Messages
