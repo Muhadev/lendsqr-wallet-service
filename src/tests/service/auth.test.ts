@@ -1,6 +1,6 @@
 import request from 'supertest';
-import app from '../app';
-import { db } from '../config/database';
+import app from '../../app';
+import { db } from '../../config/database';
 
 describe('Authentication Endpoints', () => {
   beforeAll(async () => {
