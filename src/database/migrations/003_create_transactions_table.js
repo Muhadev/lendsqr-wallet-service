@@ -6,7 +6,7 @@ exports.up = function(knex) {
   return knex.schema.createTable('transactions', function(table) {
     table.increments('id').primary();
     table.integer('account_id').unsigned().notNullable();
-    table.enum('type', ['credit', 'debit']).notNullable();
+    table.enum('type', ['CREDIT', 'DEBIT']).notNullable();
     table.decimal('amount', 15, 2).notNullable();
     table.integer('recipient_id').unsigned().nullable();
     table.string('reference', 100).notNullable().unique();
