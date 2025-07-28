@@ -21,7 +21,7 @@ export const generateToken = (payload: object): string => {
   if (!jwtSecret) {
     throw new Error('JWT_SECRET is not configured');
   }
-  return jwt.sign(payload, jwtSecret, { expiresIn: '1h' });
+  return jwt.sign(payload, jwtSecret, { expiresIn: '24h' });
 };
 
 export const generateAccountNumber = (): string => {

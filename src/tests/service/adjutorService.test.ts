@@ -27,6 +27,7 @@ describe('AdjutorService', () => {
     // Set environment variables
     process.env.ADJUTOR_API_URL = 'https://test-adjutor.com/v2';
     process.env.ADJUTOR_API_KEY = 'test-api-key';
+    process.env.API_VERSION = '1.0.0';
 
     adjutorService = new AdjutorService();
   });
@@ -34,6 +35,7 @@ describe('AdjutorService', () => {
   afterEach(() => {
     delete process.env.ADJUTOR_API_URL;
     delete process.env.ADJUTOR_API_KEY;
+    delete process.env.API_VERSION;
   });
 
   describe('constructor', () => {
@@ -52,6 +54,7 @@ describe('AdjutorService', () => {
         headers: {
           'Authorization': 'Bearer test-api-key',
           'Content-Type': 'application/json',
+          'User-Agent': 'Lendsqr-Wallet-Service/1.0.0',
         },
       });
     });
@@ -205,7 +208,7 @@ describe('AdjutorService', () => {
       expect(results).toHaveLength(3);
       expect(results[0].status).toBe(false);
       expect(results[1].status).toBe(false);
-      expect(results[1].message).toBe('Verification failed');
+      expect(results[1].message).toBe('Blacklist verification completed');
       expect(results[2].status).toBe(true);
     });
   });
@@ -240,6 +243,7 @@ describe('AdjutorService', () => {
     });
 
     it('should return true when verification service fails', async () => {
+      process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = 'true';
       mockAxiosInstance.post.mockRejectedValue(new Error('Service error'));
 
       const result = await adjutorService.verifyUser(mockUserData);

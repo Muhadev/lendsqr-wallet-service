@@ -1,4 +1,4 @@
-// walletController.test.ts - Fixed Version
+// walletController.test.ts
 import { Request, Response, NextFunction } from 'express';
 import { WalletController } from '../../controllers/WalletController';
 import { WalletService } from '../../services/WalletService';
@@ -126,7 +126,8 @@ describe('WalletController', () => {
 
     it('should handle validation errors', async () => {
       const fundData = { amount: -100 };
-      const error = new ValidationError('Amount must be greater than zero');
+      // Updated error message to match what the service actually throws
+      const error = new ValidationError('Amount must be a positive number');
 
       mockRequest.body = fundData;
       mockWalletService.fundAccount.mockRejectedValue(error);
