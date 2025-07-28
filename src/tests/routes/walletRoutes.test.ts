@@ -23,10 +23,12 @@ describe('Wallet Routes', () => {
     jest.clearAllMocks();
     
     // Mock authenticate middleware to call next()
-    mockAuthMiddleware.mockImplementation((req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-      req.user = { id: 1, email: 'test@example.com', firstName: 'Test', lastName: 'User' };
-      next();
-    });
+    mockAuthMiddleware.mockImplementation(
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+        req.user = { id: 1, email: 'test@example.com', firstName: 'Test', lastName: 'User' };
+        next();
+        }
+    );
 
     // Mock controller methods
     const mockControllerInstance = {

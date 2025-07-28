@@ -14,10 +14,12 @@ export const comparePassword = async (
   return bcrypt.compare(password, hashedPassword);
 };
 
-export const generateToken = (payload: object, expiresIn: string = '24h'): string => {
+export const generateToken = (payload: object): string => {
   const jwtSecret = process.env.JWT_SECRET;
+  const expiresIn = process.env.JWT_EXPIRES_IN || '24h';
+  
   if (!jwtSecret) {
-    throw new Error('JWT_SECRET is not defined');
+    throw new Error('JWT_SECRET is not configured');
   }
   return jwt.sign(payload, jwtSecret, { expiresIn: '1h' });
 };
@@ -30,7 +32,7 @@ export const generateAccountNumber = (): string => {
 };
 
 export const generateTransactionReference = (): string => {
-  const prefix = 'TXN';
+  const prefix = process.env.TRANSACTION_REF_PREFIX || 'TXN';
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
   return `${prefix}${timestamp}${random}`;
@@ -47,14 +49,37 @@ export const generateUUID = (): string => {
   return uuidv4();
 };
 
-export const validateEmail = (email: string): boolean => {
+export const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-export const validatePhoneNumber = (phone: string): boolean => {
+export const isValidNigerianPhone = (phone: string): boolean => {
   const phoneRegex = /^(\+234|0)[789][01]\d{8}$/;
   return phoneRegex.test(phone);
+};
+
+export const isValidBVN = (bvn: string): boolean => {
+  const bvnRegex = /^\d{11}$/;
+  return bvnRegex.test(bvn);
+};
+
+export const maskSensitiveData = (data: string): string => {
+  if (data.length <= 4) {
+    return '*'.repeat(data.length);
+  }
+  const start = data.slice(0, 2);
+  const end = data.slice(-2);
+  const middle = '*'.repeat(data.length - 4);
+  return start + middle + end;
+};
+
+export const validateEmail = (email: string): boolean => {
+  return isValidEmail(email);
+};
+
+export const validatePhoneNumber = (phone: string): boolean => {
+  return isValidNigerianPhone(phone);
 };
 
 export const sanitizeUser = (user: any) => {

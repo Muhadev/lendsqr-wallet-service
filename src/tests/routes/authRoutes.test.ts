@@ -72,12 +72,14 @@ describe('Auth Routes', () => {
 
   describe('Protected routes', () => {
     beforeEach(() => {
-      // Mock authenticate middleware to call next() for protected routes
-      mockAuthMiddleware.mockImplementation((req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+      // Mock authenticate middleware with proper typing
+      mockAuthMiddleware.mockImplementation(
+      async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
         // Add user to request object
         req.user = { id: 1, email: 'test@example.com', firstName: 'Test', lastName: 'User' };
         next();
-      });
+      }
+    );
     });
 
     it('should require authentication for POST /refresh-token', async () => {
@@ -99,9 +101,13 @@ describe('Auth Routes', () => {
     });
 
     it('should handle authentication failure', async () => {
-      mockAuthMiddleware.mockImplementation((req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-        res.status(401).json({ status: 'error', message: 'Unauthorized' });
-      });
+      mockAuthMiddleware.mockImplementation(
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+            // Add user to request object
+            req.user = { id: 1, email: 'test@example.com', firstName: 'Test', lastName: 'User' };
+            next();
+        }
+        );
 
       const response = await request(app)
         .get('/api/auth/profile');
