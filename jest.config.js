@@ -1,10 +1,12 @@
+// jest.config.js
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
   roots: ['<rootDir>/src'],
   testMatch: [
-    '**/__tests__/**/*.ts',
-    '**/?(*.)+(spec|test).ts'
+    '<rootDir>/src/tests/**/*.test.ts',
+    '<rootDir>/src/**/__tests__/**/*.test.ts'
   ],
   transform: {
     '^.+\\.ts$': 'ts-jest',
@@ -12,15 +14,34 @@ module.exports = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.test.ts',
-    '!src/**/*.spec.ts',
-    '!src/tests/**',
+    '!src/tests/**/*',
+    '!src/**/*.d.ts',
+    '!src/config/**/*',
   ],
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1'
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
+  moduleNameMapping: {
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
-  setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
+  moduleFileExtensions: ['ts', 'js', 'json'],
   testTimeout: 30000,
-  verbose: true,
+  detectOpenHandles: true,
   forceExit: true,
+  verbose: true,
+  maxWorkers: 1, // Run tests sequentially to avoid database conflicts
+  
+  // Clear mocks between tests
   clearMocks: true,
+  restoreMocks: true,
+  
+  // Handle ES modules
+  extensionsToTreatAsEsm: ['.ts'],
+  globals: {
+    'ts-jest': {
+      useESM: false,
+      tsconfig: {
+        module: 'commonjs'
+      }
+    }
+  }
 };

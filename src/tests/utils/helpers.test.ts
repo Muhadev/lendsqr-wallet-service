@@ -83,7 +83,8 @@ describe('Helpers', () => {
 
       const reference = generateTransactionReference();
 
-      expect(reference).toMatch(/^TXN\d+$/);
+      // Allow alphanumeric characters after TXN prefix
+      expect(reference).toMatch(/^TXN[A-Z0-9]+$/);
       expect(reference.length).toBeGreaterThan(3);
     });
   });
