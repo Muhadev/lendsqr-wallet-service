@@ -12,8 +12,8 @@ export interface Transaction {
 }
 
 export enum TransactionType {
-  CREDIT = 'credit',
-  DEBIT = 'debit',
+  CREDIT = 'CREDIT',  // Changed to uppercase
+  DEBIT = 'DEBIT',    // Changed to uppercase
 }
 
 export enum TransactionStatus {

@@ -139,7 +139,7 @@ describe('Wallet Integration Tests', () => {
 
       // 8. Get account summary
       const summaryResponse = await request(app)
-        .get('/api/wallet/summary')
+        .get(`${baseWalletPath}/summary`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
