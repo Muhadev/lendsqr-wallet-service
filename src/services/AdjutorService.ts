@@ -1,3 +1,4 @@
+// src/services/AdjutorService.ts
 import axios, { AxiosInstance } from 'axios';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/AppError';
@@ -23,10 +24,12 @@ export class AdjutorService {
   private client: AxiosInstance;
   private baseURL: string;
   private apiKey: string;
+  private timeout: number;
 
   constructor() {
     this.baseURL = process.env.ADJUTOR_API_URL || 'https://adjutor.lendsqr.com/v2';
     this.apiKey = process.env.ADJUTOR_API_KEY || '';
+    this.timeout = parseInt(process.env.ADJUTOR_API_TIMEOUT || '10000');
 
     if (!this.apiKey) {
       logger.error('Adjutor API key not configured');
@@ -35,10 +38,11 @@ export class AdjutorService {
 
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 10000,
+      timeout: this.timeout,
       headers: {
         'Authorization': `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
+        'User-Agent': `Lendsqr-Wallet-Service/${process.env.API_VERSION || '1.0.0'}`,
       },
     });
 
@@ -76,7 +80,8 @@ export class AdjutorService {
    */
   async checkKarmaBlacklist(identity: KarmaIdentity): Promise<KarmaCheckResponse> {
     try {
-      const response = await this.client.post('/verification/karma', identity);
+      const endpoint = process.env.KARMA_ENDPOINT || '/verification/karma';
+      const response = await this.client.post(endpoint, identity);
       
       logger.info('Karma blacklist check completed', {
         identity_type: identity.identity_type,
@@ -125,21 +130,30 @@ export class AdjutorService {
    * Check multiple identities against Karma blacklist
    */
   async checkMultipleIdentities(identities: KarmaIdentity[]): Promise<KarmaCheckResponse[]> {
-    const results = await Promise.allSettled(
-      identities.map(identity => this.checkKarmaBlacklist(identity))
-    );
+    const maxConcurrent = parseInt(process.env.KARMA_MAX_CONCURRENT_REQUESTS || '3');
+    const results: KarmaCheckResponse[] = [];
+    
+    // Process identities in batches to avoid overwhelming the API
+    for (let i = 0; i < identities.length; i += maxConcurrent) {
+      const batch = identities.slice(i, i + maxConcurrent);
+      const batchResults = await Promise.allSettled(
+        batch.map(identity => this.checkKarmaBlacklist(identity))
+      );
 
-    return results.map((result, index) => {
-      if (result.status === 'fulfilled') {
-        return result.value;
-      } else {
-        logger.error(`Karma check failed for identity ${index}:`, result.reason);
-        return {
-          status: false,
-          message: 'Verification failed',
-        };
-      }
-    });
+      batchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          logger.error(`Karma check failed for identity ${i + index}:`, result.reason);
+          results.push({
+            status: false,
+            message: 'Verification failed',
+          });
+        }
+      });
+    }
+
+    return results;
   }
 
   /**
@@ -183,7 +197,8 @@ export class AdjutorService {
     } catch (error) {
       logger.error('User verification process failed:', error);
       // In case of service failure, we'll allow registration but log the issue
-      return true;
+      const allowOnFailure = process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE === 'true';
+      return allowOnFailure;
     }
   }
 }

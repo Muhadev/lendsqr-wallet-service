@@ -1,107 +1,144 @@
+// src/app.ts
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import compression from 'compression';
-import rateLimit from 'express-rate-limit';
+import morgan from 'morgan';
 import dotenv from 'dotenv';
-import { errorHandler } from './middleware/errorHandler';
-import { logger } from './utils/logger';
+
+// Import routes
 import authRoutes from './routes/authRoutes';
 import walletRoutes from './routes/walletRoutes';
-import { db } from './config/database';
 
-// Load environment variables
+// Import middleware
+import { errorHandler } from './middleware/errorHandler';
+import { 
+  generalLimiter, 
+  authLimiter, 
+  transactionLimiter 
+} from './middleware/rateLimiter';
+
+// Import utilities
+import { logger } from './utils/logger';
+
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-});
+// Trust proxy for accurate IP addresses behind reverse proxy
+app.set('trust proxy', 1);
 
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(compression());
-app.use(limiter);
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+}));
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.CLIENT_URL?.split(',') || []
+    : ['http://localhost:3000', 'http://localhost:3001'],
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 
 // Request logging
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path} - ${req.ip}`);
-  next();
-});
+app.use(morgan('combined', {
+  stream: {
+    write: (message: string) => {
+      logger.info(message.trim());
+    },
+  },
+}));
 
-// Health check endpoint
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Apply general rate limiting to all requests
+app.use(generalLimiter);
+
+// Health check endpoint (no rate limiting)
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'success',
     message: 'Lendsqr Wallet Service is running',
     timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV,
+    version: process.env.API_VERSION || '1.0.0',
   });
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/wallet', walletRoutes);
+// API info endpoint
+app.get(`/api/${process.env.API_VERSION || 'v1'}`, (req, res) => {
+  res.status(200).json({
+    status: 'success',
+    message: 'Lendsqr Wallet Service API',
+    version: process.env.API_VERSION || '1.0.0',
+    documentation: `${process.env.API_BASE_URL}/docs`,
+    endpoints: {
+      auth: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION || 'v1'}/auth`,
+      wallet: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION || 'v1'}/wallet`,
+    },
+  });
+});
 
-// 404 handler
+// Apply stricter rate limiting to auth routes
+app.use(`/api/${process.env.API_VERSION || 'v1'}/auth`, authLimiter);
+
+// Apply transaction rate limiting to wallet routes
+app.use(`/api/${process.env.API_VERSION || 'v1'}/wallet`, transactionLimiter);
+
+// API routes
+app.use(`/api/${process.env.API_VERSION || 'v1'}/auth`, authRoutes);
+app.use(`/api/${process.env.API_VERSION || 'v1'}/wallet`, walletRoutes);
+
+// 404 handler for undefined routes
 app.use('*', (req, res) => {
   res.status(404).json({
     status: 'error',
-    message: 'Route not found',
+    message: `Route ${req.originalUrl} not found`,
   });
 });
 
 // Global error handler
 app.use(errorHandler);
 
-// Database connection test
-async function testDbConnection() {
-  try {
-    await db.raw('SELECT 1');
-    logger.info('Database connection established successfully');
-  } catch (error) {
-    logger.error('Database connection failed:', error);
-    process.exit(1);
-  }
-}
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
+// Graceful shutdown handling
+process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
-  await db.destroy();
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
+process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully');
-  await db.destroy();
   process.exit(0);
 });
 
-// Start server
-async function startServer() {
-  try {
-    await testDbConnection();
-    
-    app.listen(PORT, () => {
-      logger.info(`Server is running on port ${PORT}`);
-      logger.info(`Environment: ${process.env.NODE_ENV}`);
-    });
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
-  }
-}
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
 
-if (process.env.NODE_ENV !== 'test') {
-  startServer();
-}
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
 
 export default app;

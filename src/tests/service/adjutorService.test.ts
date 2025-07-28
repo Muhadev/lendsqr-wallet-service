@@ -1,4 +1,4 @@
-// adjutorService.test.ts
+// src/tests/service/adjutorService.test.ts
 import { AdjutorService, KarmaIdentity } from '../../services/AdjutorService';
 import axios from 'axios';
 import { AppError } from '../../utils/AppError';
@@ -106,7 +106,7 @@ describe('AdjutorService', () => {
     });
 
     it('should handle API unavailable error gracefully', async () => {
-      const error = new Error('ECONNREFUSED');
+      const error: any = new Error('ECONNREFUSED');
       error.code = 'ECONNREFUSED';
       mockAxiosInstance.post.mockRejectedValue(error);
 

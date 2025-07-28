@@ -1,9 +1,9 @@
-// authRoutes.test.ts
+// src/tests/routes/authRoutes.test.ts
 import request from 'supertest';
 import express from 'express';
 import { Request, Response, NextFunction } from 'express';
 import authRoutes from '../../routes/authRoutes';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, AuthenticatedRequest } from '../../middleware/auth';
 import { AuthController } from '../../controllers/AuthController';
 
 // Mock middleware and controller
@@ -73,9 +73,9 @@ describe('Auth Routes', () => {
   describe('Protected routes', () => {
     beforeEach(() => {
       // Mock authenticate middleware to call next() for protected routes
-      mockAuthMiddleware.mockImplementation((req: Request, res: Response, next: NextFunction) => {
+      mockAuthMiddleware.mockImplementation((req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         // Add user to request object
-        (req as any).user = { userId: 1, email: 'test@example.com' };
+        req.user = { id: 1, email: 'test@example.com', firstName: 'Test', lastName: 'User' };
         next();
       });
     });
@@ -99,7 +99,7 @@ describe('Auth Routes', () => {
     });
 
     it('should handle authentication failure', async () => {
-      mockAuthMiddleware.mockImplementation((req: Request, res: Response, next: NextFunction) => {
+      mockAuthMiddleware.mockImplementation((req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         res.status(401).json({ status: 'error', message: 'Unauthorized' });
       });
 

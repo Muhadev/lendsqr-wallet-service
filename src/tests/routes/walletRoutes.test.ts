@@ -1,9 +1,11 @@
-// walletRoutes.test.ts
+// src/tests/routes/walletRoutes.test.ts
 import request from 'supertest';
 import express from 'express';
+import { Request, Response, NextFunction } from 'express';
 import walletRoutes from '../../routes/walletRoutes';
 import { authenticate } from '../../middleware/auth';
 import { WalletController } from '../../controllers/WalletController';
+import { AuthenticatedRequest } from '../../middleware/auth';
 
 // Mock middleware and controller
 jest.mock('../../middleware/auth');
@@ -21,23 +23,23 @@ describe('Wallet Routes', () => {
     jest.clearAllMocks();
     
     // Mock authenticate middleware to call next()
-    mockAuthMiddleware.mockImplementation((req, res, next) => {
-      req.user = { userId: 1, email: 'test@example.com' };
+    mockAuthMiddleware.mockImplementation((req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+      req.user = { id: 1, email: 'test@example.com', firstName: 'Test', lastName: 'User' };
       next();
     });
 
     // Mock controller methods
     const mockControllerInstance = {
-      getBalance: jest.fn((req, res) => res.json({ status: 'success' })),
-      fundAccount: jest.fn((req, res) => res.json({ status: 'success' })),
-      transferFunds: jest.fn((req, res) => res.json({ status: 'success' })),
-      withdrawFunds: jest.fn((req, res) => res.json({ status: 'success' })),
-      getTransactionHistory: jest.fn((req, res) => res.json({ status: 'success' })),
-      getTransactionByReference: jest.fn((req, res) => res.json({ status: 'success' })),
-      getAccountSummary: jest.fn((req, res) => res.json({ status: 'success' })),
+      getBalance: jest.fn((req: Request, res: Response) => res.json({ status: 'success' })),
+      fundAccount: jest.fn((req: Request, res: Response) => res.json({ status: 'success' })),
+      transferFunds: jest.fn((req: Request, res: Response) => res.json({ status: 'success' })),
+      withdrawFunds: jest.fn((req: Request, res: Response) => res.json({ status: 'success' })),
+      getTransactionHistory: jest.fn((req: Request, res: Response) => res.json({ status: 'success' })),
+      getTransactionByReference: jest.fn((req: Request, res: Response) => res.json({ status: 'success' })),
+      getAccountSummary: jest.fn((req: Request, res: Response) => res.json({ status: 'success' })),
     };
 
-    mockWalletController.mockImplementation(() => mockControllerInstance);
+    mockWalletController.mockImplementation(() => mockControllerInstance as any);
   });
 
   it('should require authentication for all routes', async () => {
@@ -52,7 +54,7 @@ describe('Wallet Routes', () => {
     ];
 
     for (const route of routes) {
-      await request(app)[route.method](route.path).expect(200);
+      await request(app)[route.method as keyof typeof request](route.path).expect(200);
       expect(mockAuthMiddleware).toHaveBeenCalled();
     }
   });
