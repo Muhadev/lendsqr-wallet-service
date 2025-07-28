@@ -153,7 +153,7 @@ export class TransactionRepository {
     amount: number,
     reference: string,
     description: string,
-    trx: any
+    trx?: any
   ): Promise<{ debitTransaction: Transaction; creditTransaction: Transaction }> {
     // Create debit transaction for sender
     const debitTransaction = await this.create({
