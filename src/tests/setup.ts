@@ -1,41 +1,41 @@
-// src/tests/setup.ts
-import { jest } from '@jest/globals';
+// src/tests/setup.ts - Enhanced test setup
 
-// Set test environment variables
+import { db } from '../config/database';
+
+// Set test environment
 process.env.NODE_ENV = 'test';
-process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing';
-process.env.JWT_EXPIRES_IN = '24h';
-process.env.TRANSACTION_REF_PREFIX = 'TXN';
-process.env.ADJUTOR_API_URL = 'https://test-adjutor.com/v2';
-process.env.ADJUTOR_API_KEY = 'test-api-key';
-process.env.ADJUTOR_API_TIMEOUT = '10000';
-process.env.KARMA_ENDPOINT = '/verification/karma';
-process.env.KARMA_MAX_CONCURRENT_REQUESTS = '3';
-process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = 'true';
+process.env.JWT_SECRET = 'test-jwt-secret-key';
+process.env.DB_NAME = 'lendsqr_wallet_test';
 
-// Global test timeout
-jest.setTimeout(30000);
-
-// Mock console methods to reduce noise in tests
-global.console = {
-  ...console,
-  log: jest.fn(),
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-};
+// Mock AdjutorService globally for all tests
+jest.mock('../services/AdjutorService', () => {
+  return {
+    AdjutorService: jest.fn().mockImplementation(() => ({
+      verifyUser: jest.fn().mockResolvedValue(true),
+      checkKarmaBlacklist: jest.fn().mockResolvedValue({
+        status: false,
+        message: 'User is clean'
+      }),
+      checkMultipleIdentities: jest.fn().mockResolvedValue([
+        { status: false, message: 'Clean' },
+        { status: false, message: 'Clean' },
+        { status: false, message: 'Clean' }
+      ])
+    }))
+  };
+});
 
 // Global test setup
 beforeAll(async () => {
-  // Any global setup code
+  // Run migrations
+  await db.migrate.latest();
 });
 
+// Global test teardown
 afterAll(async () => {
-  // Any global cleanup code
+  // Clean up and close database connection
+  await db.destroy();
 });
 
-beforeEach(() => {
-  // Reset all mocks before each test
-  jest.clearAllMocks();
-});
+// Increase timeout for database operations
+jest.setTimeout(30000);

@@ -60,15 +60,15 @@ export class AccountRepository {
   }
 
   async updateBalance(id: number, newBalance: number, trx?: any): Promise<Account> {
-    const query = trx || db;
+  const query = trx || db; // Use transaction if provided, otherwise use db
+  
+  await query(this.tableName)
+    .where({ id })
+    .update({
+      balance: newBalance,
+      updated_at: new Date(),
+    });
     
-    await query(this.tableName)
-      .where({ id })
-      .update({
-        balance: newBalance,
-        updated_at: new Date(),
-      });
-
     const account = await this.findById(id);
     if (!account) {
       throw new NotFoundError('Account not found');

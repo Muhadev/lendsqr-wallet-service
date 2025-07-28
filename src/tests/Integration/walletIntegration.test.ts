@@ -2,6 +2,12 @@
 import request from 'supertest';
 import app from '../../app';
 import { db } from '../../config/database';
+import bcrypt from 'bcryptjs';
+
+
+const API_VERSION = process.env.API_VERSION || 'v1';
+const baseAuthPath = `/api/${API_VERSION}/auth`;
+const baseWalletPath = `/api/${API_VERSION}/wallet`;
 
 describe('Wallet Integration Tests', () => {
   let authToken: string;
@@ -36,9 +42,10 @@ describe('Wallet Integration Tests', () => {
     };
 
     const registerResponse = await request(app)
-      .post('/api/auth/register')
+      .post(`${baseAuthPath}/register`) // ✅ FIXED
       .send(userData)
       .expect(201);
+
 
     authToken = registerResponse.body.data.token;
     userId = registerResponse.body.data.user.id;
@@ -49,7 +56,7 @@ describe('Wallet Integration Tests', () => {
     it('should handle full wallet operations flow', async () => {
       // 1. Check initial balance
       const balanceResponse = await request(app)
-        .get('/api/wallet/balance')
+        .get(`${baseWalletPath}/balance`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
@@ -58,7 +65,7 @@ describe('Wallet Integration Tests', () => {
 
       // 2. Fund account
       const fundResponse = await request(app)
-        .post('/api/wallet/fund')
+        .post(`${baseWalletPath}/fund`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           amount: 5000,
@@ -71,7 +78,7 @@ describe('Wallet Integration Tests', () => {
 
       // 3. Check balance after funding
       const balanceAfterFunding = await request(app)
-        .get('/api/wallet/balance')
+        .get(`${baseWalletPath}/balance`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
@@ -88,7 +95,7 @@ describe('Wallet Integration Tests', () => {
       };
 
       const recipientResponse = await request(app)
-        .post('/api/auth/register')
+        .post(`${baseAuthPath}/register`)
         .send(recipient)
         .expect(201);
 
@@ -96,7 +103,7 @@ describe('Wallet Integration Tests', () => {
 
       // 5. Transfer funds
       const transferResponse = await request(app)
-        .post('/api/wallet/transfer')
+        .post(`${baseWalletPath}/transfer`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           recipientAccountNumber,
@@ -110,7 +117,7 @@ describe('Wallet Integration Tests', () => {
 
       // 6. Withdraw funds
       const withdrawResponse = await request(app)
-        .post('/api/wallet/withdraw')
+        .post(`${baseWalletPath}/withdraw`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           amount: 1000,
@@ -123,7 +130,7 @@ describe('Wallet Integration Tests', () => {
 
       // 7. Check transaction history
       const historyResponse = await request(app)
-        .get('/api/wallet/transactions')
+        .get(`${baseWalletPath}/transactions`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
@@ -144,7 +151,7 @@ describe('Wallet Integration Tests', () => {
       // 9. Get specific transaction by reference
       const transactionRef = withdrawResponse.body.data.transaction.reference;
       const transactionResponse = await request(app)
-        .get(`/api/wallet/transactions/${transactionRef}`)
+        .get(`${baseWalletPath}/transactions/${transactionRef}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
@@ -155,14 +162,14 @@ describe('Wallet Integration Tests', () => {
     it('should handle edge cases and error scenarios', async () => {
       // Test insufficient funds
       await request(app)
-        .post('/api/wallet/withdraw')
+        .post(`${baseWalletPath}/withdraw`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ amount: 1000 })
         .expect(400);
 
       // Test invalid recipient account
       await request(app)
-        .post('/api/wallet/transfer')
+        .post(`${baseWalletPath}/transfer`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           recipientAccountNumber: 'INVALID_ACCOUNT',
@@ -172,14 +179,14 @@ describe('Wallet Integration Tests', () => {
 
       // Test amount validation
       await request(app)
-        .post('/api/wallet/fund')
+        .post(`${baseWalletPath}/fund`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ amount: -100 })
         .expect(400);
 
       // Test maximum limits
       await request(app)
-        .post('/api/wallet/fund')
+        .post(`${baseWalletPath}/fund`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ amount: 2000000 })
         .expect(400);

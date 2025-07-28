@@ -69,19 +69,25 @@ export class WalletController {
   };
 
   transferFunds = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      throw new AppError('User not authenticated', 401);
+    }
+
+    // Validate request data
+    const { error, value } = transferSchema.validate(req.body);
+    if (error) {
+      throw new AppError(error.details[0].message, 400);
+    }
+
+    const transferData: TransferData = value;
+
+    // Additional validation: Check if account number format is valid
+    if (!/^\d{10}$/.test(transferData.recipientAccountNumber)) {
+      throw new AppError('Account number must be exactly 10 digits', 400);
+    }
+
     try {
-      if (!req.user) {
-        throw new AppError('User not authenticated', 401);
-      }
-
-      // Validate request data
-      const { error, value } = transferSchema.validate(req.body);
-      if (error) {
-        throw new AppError(error.details[0].message, 400);
-      }
-
-      const transferData: TransferData = value;
-
       // Transfer funds
       const result = await this.walletService.transferFunds(req.user.id, transferData);
 
@@ -90,10 +96,18 @@ export class WalletController {
         message: 'Funds transferred successfully',
         data: result,
       });
-    } catch (error) {
-      next(error);
+    } catch (serviceError: any) {
+      // Check if it's a "not found" error and convert to 404
+      if (serviceError.message.includes('Recipient account not found')) {
+        throw new AppError('Recipient account not found', 404);
+      }
+      // Re-throw other service errors
+      throw serviceError;
     }
-  };
+  } catch (error) {
+    next(error);
+  }
+};
 
   withdrawFunds = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
     try {

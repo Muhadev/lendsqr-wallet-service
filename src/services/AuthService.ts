@@ -6,7 +6,7 @@ import { AccountStatus } from '../models/Account';
 import { 
   hashPassword, 
   comparePassword, 
-  generateToken, 
+  generateToken,
   generateAccountNumber,
   sanitizeUser 
 } from '../utils/helpers';
