@@ -1,4 +1,4 @@
-// src/tests/setup.ts - Enhanced test setup
+// src/tests/setup.ts - Enhanced version of your existing setup
 
 import { db } from '../config/database';
 
@@ -27,14 +27,33 @@ jest.mock('../services/AdjutorService', () => {
 
 // Global test setup
 beforeAll(async () => {
-  // Run migrations
-  await db.migrate.latest();
+  try {
+    // Ensure we're connected to the test database
+    await db.raw('SELECT 1');
+    console.log('Test database connected successfully');
+    
+    // Run migrations
+    await db.migrate.latest();
+    console.log('Test migrations completed');
+  } catch (error) {
+    console.error('Test setup failed:', error);
+    throw error;
+  }
 });
 
 // Global test teardown
 afterAll(async () => {
-  // Clean up and close database connection
-  await db.destroy();
+  try {
+    // Rollback migrations to clean state
+    await db.migrate.rollback();
+    console.log('Test migrations rolled back');
+  } catch (error) {
+    console.warn('Migration rollback failed:', error);
+  } finally {
+    // Clean up and close database connection
+    await db.destroy();
+    console.log('Test database connection closed');
+  }
 });
 
 // Increase timeout for database operations

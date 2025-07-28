@@ -60,7 +60,7 @@ export class AccountRepository {
   }
 
   async updateBalance(id: number, newBalance: number, trx?: any): Promise<Account> {
-  const query = trx || db; // Use transaction if provided, otherwise use db
+  const query = trx || db;
   
   await query(this.tableName)
     .where({ id })
@@ -69,14 +69,17 @@ export class AccountRepository {
       updated_at: new Date(),
     });
     
-    const account = await this.findById(id);
-    if (!account) {
-      throw new NotFoundError('Account not found');
-    }
+  // Get updated account using the same transaction context
+  const result = await query(this.tableName)
+    .where({ id })
+    .first();
 
-    return account;
+  if (!result) {
+    throw new NotFoundError('Account not found');
   }
 
+  return this.mapDbToModel(result);
+}
   async updateStatus(id: number, status: AccountStatus): Promise<Account> {
     await db(this.tableName)
       .where({ id })

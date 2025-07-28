@@ -175,7 +175,7 @@ describe('Wallet Integration Tests', () => {
           recipientAccountNumber: 'INVALID_ACCOUNT',
           amount: 100,
         })
-        .expect(404);
+        .expect(400);
 
       // Test amount validation
       await request(app)

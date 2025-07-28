@@ -64,72 +64,75 @@ export class WalletService {
   }
 
   async fundAccount(userId: number, fundData: FundAccountData): Promise<{
-    transaction: TransactionResponse;
-    newBalance: number;
-  }> {
-    // Validate amount
-    if (fundData.amount <= 0) {
-      throw new ValidationError('Amount must be greater than zero');
-    }
-
-    if (fundData.amount < 100) {
-      throw new ValidationError('Minimum funding amount is ₦100');
-    }
-
-    if (fundData.amount > 1000000) {
-      throw new ValidationError('Maximum funding amount is ₦1,000,000');
-    }
-
-    // Get user account
-    const account = await this.accountRepository.findByUserId(userId);
-    if (!account) {
-      throw new NotFoundError('Account not found');
-    }
-
-    // Check account status
-    if (account.status !== AccountStatus.ACTIVE) {
-      throw new AppError('Account is not active', 403);
-    }
-
-    // Use database transaction
-    const result = await db.transaction(async (trx) => {
-      // Generate transaction reference
-      const reference = generateTransactionReference();
-
-      // Create credit transaction
-      const transaction = await this.transactionRepository.create({
-        accountId: account.id,
-        type: TransactionType.CREDIT,
-        amount: fundData.amount,
-        reference,
-        status: TransactionStatus.COMPLETED,
-        description: fundData.description || 'Account funding',
-      }, trx);
-
-      // Update account balance
-      const newBalance = account.balance + fundData.amount;
-      const updatedAccount = await this.accountRepository.updateBalance(
-        account.id, 
-        newBalance, 
-        trx
-      );
-
-      return { transaction, newBalance: updatedAccount.balance };
-    });
-
-    logger.info('Account funded successfully', {
-      userId,
-      accountNumber: account.accountNumber,
-      amount: fundData.amount,
-      reference: result.transaction.reference,
-      newBalance: result.newBalance,
-    });
-
-    return {
-      transaction: this.sanitizeTransaction(result.transaction),
-      newBalance: result.newBalance,
-    };
+  transaction: TransactionResponse;
+  newBalance: number;
+}> {
+  // Validate amount
+  if (fundData.amount <= 0) {
+    throw new ValidationError('Amount must be greater than zero');
   }
+
+  if (fundData.amount < 100) {
+    throw new ValidationError('Minimum funding amount is ₦100');
+  }
+
+  if (fundData.amount > 1000000) {
+    throw new ValidationError('Maximum funding amount is ₦1,000,000');
+  }
+
+  // Get user account
+  const account = await this.accountRepository.findByUserId(userId);
+  if (!account) {
+    throw new NotFoundError('Account not found');
+  }
+
+  // Check account status
+  if (account.status !== AccountStatus.ACTIVE) {
+    throw new AppError('Account is not active', 403);
+  }
+
+  // Use database transaction
+  const result = await db.transaction(async (trx) => {
+    // Generate transaction reference
+    const reference = generateTransactionReference();
+
+    // Calculate new balance first
+    const newBalance = account.balance + fundData.amount;
+
+    // Update account balance within transaction
+    await trx('accounts')
+      .where({ id: account.id })
+      .update({
+        balance: newBalance,
+        updated_at: new Date(),
+      });
+
+    // Create credit transaction
+    const transaction = await this.transactionRepository.create({
+      accountId: account.id,
+      type: TransactionType.CREDIT,
+      amount: fundData.amount,
+      reference,
+      status: TransactionStatus.COMPLETED,
+      description: fundData.description || 'Account funding',
+    }, trx);
+
+    return { transaction, newBalance };
+  });
+
+  logger.info('Account funded successfully', {
+    userId,
+    accountNumber: account.accountNumber,
+    amount: fundData.amount,
+    reference: result.transaction.reference,
+    newBalance: result.newBalance,
+  });
+
+  return {
+    transaction: this.sanitizeTransaction(result.transaction),
+    newBalance: result.newBalance,
+  };
+}
 
   async transferFunds(userId: number, transferData: TransferData): Promise<{
     transaction: TransactionResponse;

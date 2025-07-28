@@ -87,24 +87,26 @@ export class WalletController {
       throw new AppError('Account number must be exactly 10 digits', 400);
     }
 
-    try {
-      // Transfer funds
-      const result = await this.walletService.transferFunds(req.user.id, transferData);
+    // Transfer funds
+    const result = await this.walletService.transferFunds(req.user.id, transferData);
 
-      res.status(200).json({
-        status: 'success',
-        message: 'Funds transferred successfully',
-        data: result,
-      });
-    } catch (serviceError: any) {
-      // Check if it's a "not found" error and convert to 404
-      if (serviceError.message.includes('Recipient account not found')) {
-        throw new AppError('Recipient account not found', 404);
-      }
-      // Re-throw other service errors
-      throw serviceError;
+    res.status(200).json({
+      status: 'success',
+      message: 'Funds transferred successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    // Convert specific service errors to appropriate HTTP status codes
+    if (error.message && error.message.includes('Recipient account not found')) {
+      next(new AppError('Recipient account not found', 404));
+      return;
     }
-  } catch (error) {
+    
+    if (error.message && error.message.includes('not found')) {
+      next(new AppError(error.message, 404));
+      return;
+    }
+    
     next(error);
   }
 };
