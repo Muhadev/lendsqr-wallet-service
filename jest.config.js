@@ -20,7 +20,7 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
@@ -36,12 +36,12 @@ module.exports = {
   
   // Handle ES modules
   extensionsToTreatAsEsm: ['.ts'],
-  globals: {
-    'ts-jest': {
+  transform: {
+    '^.+\\.ts$': ['ts-jest', {
       useESM: false,
       tsconfig: {
         module: 'commonjs'
       }
-    }
-  }
+    }],
+  },
 };
