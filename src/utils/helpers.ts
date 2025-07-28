@@ -1,6 +1,8 @@
+// src/utils/helpers.ts - Fixed version with better reference generation
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 export const hashPassword = async (password: string): Promise<string> => {
   const saltRounds = 12;
@@ -21,21 +23,25 @@ export const generateToken = (payload: object): string => {
   if (!jwtSecret) {
     throw new Error('JWT_SECRET is not configured');
   }
-  return jwt.sign(payload, jwtSecret, { expiresIn: '24h' });
+  return jwt.sign(payload, jwtSecret, { expiresIn : '24h' });
 };
 
 export const generateAccountNumber = (): string => {
-  // Generate a 10-digit account number
+  // Generate a 10-digit account number with better uniqueness
   const timestamp = Date.now().toString().slice(-6);
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+  const random = crypto.randomInt(1000, 9999).toString();
   return timestamp + random;
 };
 
+// FIXED: Better transaction reference generation with guaranteed uniqueness
 export const generateTransactionReference = (): string => {
   const prefix = process.env.TRANSACTION_REF_PREFIX || 'TXN';
   const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `${prefix}${timestamp}${random}`;
+  // Use crypto for better randomness and longer string
+  const random = crypto.randomBytes(4).toString('hex').toUpperCase();
+  // Add process.hrtime for nanosecond precision
+  const nanos = process.hrtime.bigint().toString().slice(-3);
+  return `${prefix}${timestamp}${nanos}${random}`;
 };
 
 export const formatCurrency = (amount: number): string => {

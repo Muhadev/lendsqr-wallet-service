@@ -1,3 +1,4 @@
+// src/services/WalletService.ts - Fixed version with better transaction handling
 import { AccountRepository } from '../repositories/AccountRepository';
 import { TransactionRepository } from '../repositories/TransactionRepository';
 import { UserRepository } from '../repositories/UserRepository';
@@ -64,75 +65,102 @@ export class WalletService {
   }
 
   async fundAccount(userId: number, fundData: FundAccountData): Promise<{
-  transaction: TransactionResponse;
-  newBalance: number;
-}> {
-  // Validate amount
-  if (fundData.amount <= 0) {
-    throw new ValidationError('Amount must be greater than zero');
-  }
+    transaction: TransactionResponse;
+    newBalance: number;
+  }> {
+    // Validate amount
+    if (fundData.amount <= 0) {
+      throw new ValidationError('Amount must be a positive number');
+    }
 
-  if (fundData.amount < 100) {
-    throw new ValidationError('Minimum funding amount is ₦100');
-  }
+    if (fundData.amount < 100) {
+      throw new ValidationError('Minimum funding amount is ₦100');
+    }
 
-  if (fundData.amount > 1000000) {
-    throw new ValidationError('Maximum funding amount is ₦1,000,000');
-  }
+    if (fundData.amount > 1000000) {
+      throw new ValidationError('Maximum funding amount is ₦1,000,000');
+    }
 
-  // Get user account
-  const account = await this.accountRepository.findByUserId(userId);
-  if (!account) {
-    throw new NotFoundError('Account not found');
-  }
+    // Get user account
+    const account = await this.accountRepository.findByUserId(userId);
+    if (!account) {
+      throw new NotFoundError('Account not found');
+    }
 
-  // Check account status
-  if (account.status !== AccountStatus.ACTIVE) {
-    throw new AppError('Account is not active', 403);
-  }
+    // Check account status
+    if (account.status !== AccountStatus.ACTIVE) {
+      throw new AppError('Account is not active', 403);
+    }
 
-  // Use database transaction
-  const result = await db.transaction(async (trx) => {
-    // Generate transaction reference
-    const reference = generateTransactionReference();
+    // Use database transaction for atomicity
+    const result = await db.transaction(async (trx) => {
+      // Generate unique transaction reference
+      let reference: string;
+      let referenceExists = true;
+      let attempts = 0;
+      const maxAttempts = 5;
 
-    // Calculate new balance first
-    const newBalance = account.balance + fundData.amount;
+      // Ensure unique reference
+      while (referenceExists && attempts < maxAttempts) {
+        reference = generateTransactionReference();
+        const existingTransaction = await trx('transactions')
+          .where({ reference })
+          .first();
+        referenceExists = !!existingTransaction;
+        attempts++;
+      }
 
-    // Update account balance within transaction
-    await trx('accounts')
-      .where({ id: account.id })
-      .update({
-        balance: newBalance,
+      if (referenceExists) {
+        throw new AppError('Unable to generate unique transaction reference', 500);
+      }
+
+      // Calculate new balance
+      const newBalance = account.balance + fundData.amount;
+
+      // Update account balance
+      await trx('accounts')
+        .where({ id: account.id })
+        .update({
+          balance: newBalance,
+          updated_at: new Date(),
+        });
+
+      // Create credit transaction
+      const [transactionId] = await trx('transactions').insert({
+        account_id: account.id,
+        type: TransactionType.CREDIT,
+        amount: fundData.amount,
+        reference: reference!,
+        status: TransactionStatus.COMPLETED,
+        description: fundData.description || 'Account funding',
+        created_at: new Date(),
         updated_at: new Date(),
       });
 
-    // Create credit transaction
-    const transaction = await this.transactionRepository.create({
-      accountId: account.id,
-      type: TransactionType.CREDIT,
+      // Get the created transaction
+      const transaction = await trx('transactions')
+        .where({ id: transactionId })
+        .first();
+
+      return { 
+        transaction: this.mapDbToTransaction(transaction), 
+        newBalance 
+      };
+    });
+
+    logger.info('Account funded successfully', {
+      userId,
+      accountNumber: account.accountNumber,
       amount: fundData.amount,
-      reference,
-      status: TransactionStatus.COMPLETED,
-      description: fundData.description || 'Account funding',
-    }, trx);
+      reference: result.transaction.reference,
+      newBalance: result.newBalance,
+    });
 
-    return { transaction, newBalance };
-  });
-
-  logger.info('Account funded successfully', {
-    userId,
-    accountNumber: account.accountNumber,
-    amount: fundData.amount,
-    reference: result.transaction.reference,
-    newBalance: result.newBalance,
-  });
-
-  return {
-    transaction: this.sanitizeTransaction(result.transaction),
-    newBalance: result.newBalance,
-  };
-}
+    return {
+      transaction: this.sanitizeTransaction(result.transaction),
+      newBalance: result.newBalance,
+    };
+  }
 
   async transferFunds(userId: number, transferData: TransferData): Promise<{
     transaction: TransactionResponse;
@@ -140,7 +168,7 @@ export class WalletService {
   }> {
     // Validate amount
     if (transferData.amount <= 0) {
-      throw new ValidationError('Amount must be greater than zero');
+      throw new ValidationError('Amount must be a positive number');
     }
 
     if (transferData.amount < 10) {
@@ -187,32 +215,81 @@ export class WalletService {
       );
     }
 
-    // Use database transaction
+    // Use database transaction for atomicity
     const result = await db.transaction(async (trx) => {
-      // Generate transaction reference
-      const reference = generateTransactionReference();
+      // Generate unique transaction reference
+      let reference: string;
+      let referenceExists = true;
+      let attempts = 0;
+      const maxAttempts = 5;
 
-      // Transfer funds between accounts
-      const { senderAccount: updatedSenderAccount } = await this.accountRepository.transferFunds(
-        senderAccount.id,
-        recipientAccount.id,
-        transferData.amount,
-        trx
-      );
+      while (referenceExists && attempts < maxAttempts) {
+        reference = generateTransactionReference();
+        const existingTransaction = await trx('transactions')
+          .where({ reference })
+          .first();
+        referenceExists = !!existingTransaction;
+        attempts++;
+      }
 
-      // Create transaction records
-      const { debitTransaction } = await this.transactionRepository.createTransferTransactions(
-        senderAccount.id,
-        recipientAccount.id,
-        transferData.amount,
-        reference,
-        transferData.description || 'Fund transfer',
-        trx
-      );
+      if (referenceExists) {
+        throw new AppError('Unable to generate unique transaction reference', 500);
+      }
+
+      // Calculate new balances
+      const newSenderBalance = senderAccount.balance - transferData.amount;
+      const newRecipientBalance = recipientAccount.balance + transferData.amount;
+
+      // Update sender account balance
+      await trx('accounts')
+        .where({ id: senderAccount.id })
+        .update({
+          balance: newSenderBalance,
+          updated_at: new Date(),
+        });
+
+      // Update recipient account balance
+      await trx('accounts')
+        .where({ id: recipientAccount.id })
+        .update({
+          balance: newRecipientBalance,
+          updated_at: new Date(),
+        });
+
+      // Create debit transaction for sender
+      const [debitTransactionId] = await trx('transactions').insert({
+        account_id: senderAccount.id,
+        type: TransactionType.DEBIT,
+        amount: transferData.amount,
+        recipient_id: recipientAccount.id,
+        reference: reference!,
+        status: TransactionStatus.COMPLETED,
+        description: transferData.description || 'Fund transfer',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      // Create credit transaction for recipient
+      await trx('transactions').insert({
+        account_id: recipientAccount.id,
+        type: TransactionType.CREDIT,
+        amount: transferData.amount,
+        recipient_id: senderAccount.id,
+        reference: reference!,
+        status: TransactionStatus.COMPLETED,
+        description: transferData.description || 'Fund transfer',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      // Get the debit transaction
+      const debitTransaction = await trx('transactions')
+        .where({ id: debitTransactionId })
+        .first();
 
       return { 
-        transaction: debitTransaction, 
-        newBalance: updatedSenderAccount.balance 
+        transaction: this.mapDbToTransaction(debitTransaction), 
+        newBalance: newSenderBalance 
       };
     });
 
@@ -237,7 +314,7 @@ export class WalletService {
   }> {
     // Validate amount
     if (withdrawData.amount <= 0) {
-      throw new ValidationError('Amount must be greater than zero');
+      throw new ValidationError('Amount must be a positive number');
     }
 
     if (withdrawData.amount < 100) {
@@ -266,30 +343,59 @@ export class WalletService {
       );
     }
 
-    // Use database transaction
+    // Use database transaction for atomicity
     const result = await db.transaction(async (trx) => {
-      // Generate transaction reference
-      const reference = generateTransactionReference();
+      // Generate unique transaction reference
+      let reference: string;
+      let referenceExists = true;
+      let attempts = 0;
+      const maxAttempts = 5;
+
+      while (referenceExists && attempts < maxAttempts) {
+        reference = generateTransactionReference();
+        const existingTransaction = await trx('transactions')
+          .where({ reference })
+          .first();
+        referenceExists = !!existingTransaction;
+        attempts++;
+      }
+
+      if (referenceExists) {
+        throw new AppError('Unable to generate unique transaction reference', 500);
+      }
+
+      // Calculate new balance
+      const newBalance = account.balance - withdrawData.amount;
+
+      // Update account balance  
+      await trx('accounts')
+        .where({ id: account.id })
+        .update({
+          balance: newBalance,
+          updated_at: new Date(),
+        });
 
       // Create debit transaction
-      const transaction = await this.transactionRepository.create({
-        accountId: account.id,
+      const [transactionId] = await trx('transactions').insert({
+        account_id: account.id,
         type: TransactionType.DEBIT,
         amount: withdrawData.amount,
-        reference,
+        reference: reference!,
         status: TransactionStatus.COMPLETED,
         description: withdrawData.description || 'Cash withdrawal',
-      }, trx);
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
 
-      // Update account balance
-      const newBalance = account.balance - withdrawData.amount;
-      const updatedAccount = await this.accountRepository.updateBalance(
-        account.id, 
-        newBalance, 
-        trx
-      );
+      // Get the created transaction
+      const transaction = await trx('transactions')
+        .where({ id: transactionId })
+        .first();
 
-      return { transaction, newBalance: updatedAccount.balance };
+      return { 
+        transaction: this.mapDbToTransaction(transaction), 
+        newBalance 
+      };
     });
 
     logger.info('Funds withdrawn successfully', {
@@ -384,6 +490,21 @@ export class WalletService {
       balance: account.balance,
       accountNumber: account.accountNumber,
       ...summary,
+    };
+  }
+
+  private mapDbToTransaction(dbResult: any): any {
+    return {
+      id: dbResult.id,
+      accountId: dbResult.account_id,
+      type: dbResult.type,
+      amount: parseFloat(dbResult.amount),
+      recipientId: dbResult.recipient_id,
+      reference: dbResult.reference,
+      status: dbResult.status,
+      description: dbResult.description,
+      createdAt: dbResult.created_at,
+      updatedAt: dbResult.updated_at,
     };
   }
 

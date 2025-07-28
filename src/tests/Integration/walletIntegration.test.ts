@@ -1,9 +1,7 @@
-// walletIntegration.test.ts
+// src/tests/Integration/walletIntegration.test.ts - Enhanced version
 import request from 'supertest';
 import app from '../../app';
 import { db } from '../../config/database';
-import bcrypt from 'bcryptjs';
-
 
 const API_VERSION = process.env.API_VERSION || 'v1';
 const baseAuthPath = `/api/${API_VERSION}/auth`;
@@ -13,27 +11,35 @@ describe('Wallet Integration Tests', () => {
   let authToken: string;
   let userId: number;
   let accountNumber: string;
+  let recipientAuthToken: string;
+  let recipientAccountNumber: string;
 
   beforeAll(async () => {
-    // Run migrations
+    // Ensure migrations are up to date
     await db.migrate.latest();
   });
 
   afterAll(async () => {
-    // Clean up database
-    await db.migrate.rollback();
+    // Clean up
+    try {
+      await db.migrate.rollback(undefined, true);
+    } catch (error) {
+      // Ignore rollback errors
+    }
     await db.destroy();
   });
 
   beforeEach(async () => {
     // Clean up tables before each test
+    await db.raw('SET FOREIGN_KEY_CHECKS = 0');
     await db('transactions').del();
     await db('accounts').del();
     await db('users').del();
+    await db.raw('SET FOREIGN_KEY_CHECKS = 1');
 
-    // Register a test user
+    // Register primary test user
     const userData = {
-      email: 'test@example.com',
+      email: 'test12@example.com',
       phone: '08123456789',
       firstName: 'Test',
       lastName: 'User',
@@ -42,14 +48,31 @@ describe('Wallet Integration Tests', () => {
     };
 
     const registerResponse = await request(app)
-      .post(`${baseAuthPath}/register`) // ✅ FIXED
+      .post(`${baseAuthPath}/register`)
       .send(userData)
       .expect(201);
-
 
     authToken = registerResponse.body.data.token;
     userId = registerResponse.body.data.user.id;
     accountNumber = registerResponse.body.data.account.accountNumber;
+
+    // Register recipient user for transfer tests
+    const recipientData = {
+      email: 'recipient12@example.com',
+      phone: '08198765432',
+      firstName: 'Recipient',
+      lastName: 'User',
+      bvn: '10987654321',
+      password: 'Password123!',
+    };
+
+    const recipientResponse = await request(app)
+      .post(`${baseAuthPath}/register`)
+      .send(recipientData)
+      .expect(201);
+
+    recipientAuthToken = recipientResponse.body.data.token;
+    recipientAccountNumber = recipientResponse.body.data.account.accountNumber;
   });
 
   describe('Complete wallet workflow', () => {
@@ -86,7 +109,7 @@ describe('Wallet Integration Tests', () => {
 
       // 4. Create another user for transfer test
       const recipient = {
-        email: 'recipient@example.com',
+        email: 'recipient12@example.com',
         phone: '08198765432',
         firstName: 'Recipient',
         lastName: 'User',
