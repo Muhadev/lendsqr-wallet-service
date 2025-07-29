@@ -35,6 +35,7 @@ export interface CreateTransactionData {
 
 export interface TransactionResponse {
   id: number;
+  accountId: number;
   type: TransactionType;
   amount: number;
   recipientId?: number;

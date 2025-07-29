@@ -511,6 +511,7 @@ export class WalletService {
   private sanitizeTransaction(transaction: any): TransactionResponse {
     return {
       id: transaction.id,
+      accountId: transaction.accountId,
       type: transaction.type,
       amount: transaction.amount,
       recipientId: transaction.recipientId,
