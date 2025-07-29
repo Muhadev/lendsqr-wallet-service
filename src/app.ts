@@ -8,6 +8,7 @@ import dotenv from 'dotenv';
 // Import routes
 import authRoutes from './routes/authRoutes';
 import walletRoutes from './routes/walletRoutes';
+import kycRoutes from './routes/kycRoutes';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -106,6 +107,7 @@ app.use(`/api/${process.env.API_VERSION || 'v1'}/wallet`, transactionLimiter);
 // API routes
 app.use(`/api/${process.env.API_VERSION || 'v1'}/auth`, authRoutes);
 app.use(`/api/${process.env.API_VERSION || 'v1'}/wallet`, walletRoutes);
+app.use(`/api/${process.env.API_VERSION || 'v1'}/kyc`, kycRoutes);
 
 // 404 handler for undefined routes
 app.use('*', (req, res) => {

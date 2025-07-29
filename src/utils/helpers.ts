@@ -32,15 +32,10 @@ export const generateAccountNumber = (): string => {
 
 // FIXED: Better transaction reference generation without process.hrtime.bigint
 export const generateTransactionReference = (): string => {
-  const prefix = process.env.TRANSACTION_REF_PREFIX || "TXN"
-  const timestamp = Date.now()
-  // Use crypto for better randomness and longer string
-  const random = crypto.randomBytes(4).toString("hex").toUpperCase()
-  // Use performance.now() for better precision instead of process.hrtime.bigint
-  const precision = Math.floor(performance.now() * 1000)
-    .toString()
-    .slice(-3)
-  return `${prefix}${timestamp}${precision}${random}`
+  const prefix = process.env.TRANSACTION_REF_PREFIX || "TXN";
+  // Use crypto.randomUUID for guaranteed uniqueness
+  const uuid = crypto.randomUUID().replace(/-/g, "").toUpperCase();
+  return `${prefix}${uuid}`;
 }
 
 export const formatCurrency = (amount: number): string => {

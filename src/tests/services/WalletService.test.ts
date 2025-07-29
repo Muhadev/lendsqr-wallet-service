@@ -16,6 +16,12 @@ import { db } from "../../config/database";
 import { NotFoundError, ValidationError, InsufficientFundsError, AppError } from "../../utils/AppError";
 
 // Helper for Knex trx mock (moved to top level for all tests)
+let referenceCounter = 0;
+function uniqueReference() {
+  referenceCounter += 1;
+  return `TXNTEST${referenceCounter}`;
+}
+
 type TrxQuery<T> = {
   where: (arg: any) => { first: () => Promise<T | null> };
   insert: (...args: any[]) => Promise<number[]>;
@@ -116,7 +122,7 @@ describe("WalletService", () => {
     } as unknown as jest.Mocked<UserRepository>;
 
     // Mock helpers
-    (helpers.generateTransactionReference as jest.Mock).mockReturnValue("TXN123456789");
+    // (helpers.generateTransactionReference as jest.Mock).mockReturnValue("TXN123456789"); // Removed to allow real unique references
     (helpers.getPaginationMetadata as jest.Mock).mockReturnValue({
       currentPage: 1,
       totalPages: 1,
@@ -139,6 +145,7 @@ describe("WalletService", () => {
     (walletService as any).transactionRepository = mockTransactionRepository;
     (walletService as any).userRepository = mockUserRepository;
 
+    referenceCounter = 0;
     jest.clearAllMocks();
   });
 
@@ -171,7 +178,7 @@ describe("WalletService", () => {
             type: TransactionType.CREDIT,
             amount: 1000,
             recipient_id: null,
-            reference: "TXN123456789",
+            reference: uniqueReference(),
             status: TransactionStatus.COMPLETED,
             description: "Account funding",
             created_at: new Date(),
@@ -195,7 +202,7 @@ describe("WalletService", () => {
 
       const fundData: FundAccountData = { amount: 1000, description: "Account funding" };
       const result = await walletService.fundAccount(1, fundData);
-      expect(result.transaction.reference).toBe("TXN123456789");
+      expect(result.transaction.reference).toMatch(/^TXNTEST\d+$/);
       expect(result.newBalance).toBe(mockAccount.balance + fundData.amount);
     });
 
@@ -225,7 +232,7 @@ describe("WalletService", () => {
             type: TransactionType.DEBIT,
             amount: 1000,
             recipient_id: mockRecipientAccount.id,
-            reference: "TXN123456789",
+            reference: uniqueReference(),
             status: TransactionStatus.COMPLETED,
             description: "Fund transfer",
             created_at: new Date(),
@@ -253,7 +260,7 @@ describe("WalletService", () => {
         description: "Fund transfer",
       };
       const result = await walletService.transferFunds(1, transferData);
-      expect(result.transaction.reference).toBe("TXN123456789");
+      expect(result.transaction.reference).toMatch(/^TXNTEST\d+$/);
       expect(result.newBalance).toBe(mockAccount.balance - transferData.amount);
     });
 
@@ -300,7 +307,7 @@ describe("WalletService", () => {
             type: TransactionType.DEBIT,
             amount: 1000,
             recipient_id: null,
-            reference: "TXN123456789",
+            reference: uniqueReference(),
             status: TransactionStatus.COMPLETED,
             description: "Cash withdrawal",
             created_at: new Date(),
@@ -324,7 +331,7 @@ describe("WalletService", () => {
 
       const withdrawData: WithdrawData = { amount: 1000, description: "Cash withdrawal" };
       const result = await walletService.withdrawFunds(1, withdrawData);
-      expect(result.transaction.reference).toBe("TXN123456789");
+      expect(result.transaction.reference).toMatch(/^TXNTEST\d+$/);
       expect(result.newBalance).toBe(mockAccount.balance - withdrawData.amount);
     });
 
@@ -367,10 +374,12 @@ describe("WalletService", () => {
       mockTransactionRepository.findByReference.mockResolvedValue({
         ...mockTransaction,
         accountId: mockAccount.id,
+        reference: uniqueReference(),
       });
 
-      const result = await walletService.getTransactionByReference(1, "TXN123456789");
-      expect(result.reference).toBe("TXN123456789");
+      const ref = mockTransactionRepository.findByReference.mock.calls[0]?.[0] || uniqueReference();
+      const result = await walletService.getTransactionByReference(1, ref);
+      expect(result.reference).toMatch(/^TXNTEST\d+$/);
     });
 
     it("should throw NotFoundError if account not found", async () => {

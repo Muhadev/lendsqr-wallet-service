@@ -1,3 +1,4 @@
+// src/controllers/AuthController.ts - Updated with debug logging
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '../services/AuthService';
 import { CreateUserData, LoginCredentials } from '../models/User';
@@ -14,23 +15,34 @@ export class AuthController {
 
   register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log('=== REGISTRATION DEBUG ===');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+      
       // Validate request data
       const { error, value } = registerSchema.validate(req.body);
       if (error) {
+        console.log('Validation error:', error.details[0].message);
         throw new AppError(error.details[0].message, 400);
       }
 
+      console.log('Validation passed, calling AuthService...');
       const userData: CreateUserData = value;
 
       // Register user
       const result = await this.authService.register(userData);
+      console.log('Registration successful!');
 
       res.status(201).json({
         status: 'success',
         message: 'User registered successfully',
         data: result,
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Registration error:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.constructor.name
+      });
       next(error);
     }
   };

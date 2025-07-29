@@ -20,6 +20,7 @@ import {
 } from '../utils/AppError';
 import { logger } from '../utils/logger';
 import { db } from '../config/database';
+import type { Knex } from 'knex';
 
 export interface WalletBalance {
   accountNumber: string;
@@ -93,24 +94,27 @@ export class WalletService {
     }
 
     // Use database transaction for atomicity
-    const result = await db.transaction(async (trx) => {
+    const result = await db.transaction(async (trx: Knex.Transaction) => {
       // Generate unique transaction reference
       let reference: string;
       let referenceExists = true;
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 20; // Increased attempts for assessment
 
-      // Ensure unique reference
       while (referenceExists && attempts < maxAttempts) {
         reference = generateTransactionReference();
         const existingTransaction = await trx('transactions')
           .where({ reference })
           .first();
+        if (existingTransaction) {
+          console.warn(`Duplicate transaction reference generated: ${reference} (attempt ${attempts + 1})`);
+        }
         referenceExists = !!existingTransaction;
         attempts++;
       }
 
       if (referenceExists) {
+        console.error(`Failed to generate unique transaction reference after ${maxAttempts} attempts.`);
         throw new AppError('Unable to generate unique transaction reference', 500);
       }
 
@@ -216,23 +220,47 @@ export class WalletService {
     }
 
     // Use database transaction for atomicity
-    const result = await db.transaction(async (trx) => {
-      // Generate unique transaction reference
-      let reference: string;
+    const result = await db.transaction(async (trx: Knex.Transaction) => {
+      // Generate unique transaction references for each transaction
+      let debitReference: string;
+      let creditReference: string;
       let referenceExists = true;
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 20;
 
+      // Generate unique reference for debit transaction
       while (referenceExists && attempts < maxAttempts) {
-        reference = generateTransactionReference();
+        debitReference = generateTransactionReference();
         const existingTransaction = await trx('transactions')
-          .where({ reference })
+          .where({ reference: debitReference })
           .first();
+        if (existingTransaction) {
+          console.warn(`Duplicate debit transaction reference generated: ${debitReference} (attempt ${attempts + 1})`);
+        }
         referenceExists = !!existingTransaction;
         attempts++;
       }
-
       if (referenceExists) {
+        console.error(`Failed to generate unique debit transaction reference after ${maxAttempts} attempts.`);
+        throw new AppError('Unable to generate unique transaction reference', 500);
+      }
+
+      // Generate unique reference for credit transaction
+      referenceExists = true;
+      attempts = 0;
+      while (referenceExists && attempts < maxAttempts) {
+        creditReference = generateTransactionReference();
+        const existingTransaction = await trx('transactions')
+          .where({ reference: creditReference })
+          .first();
+        if (existingTransaction) {
+          console.warn(`Duplicate credit transaction reference generated: ${creditReference} (attempt ${attempts + 1})`);
+        }
+        referenceExists = !!existingTransaction;
+        attempts++;
+      }
+      if (referenceExists) {
+        console.error(`Failed to generate unique credit transaction reference after ${maxAttempts} attempts.`);
         throw new AppError('Unable to generate unique transaction reference', 500);
       }
 
@@ -262,7 +290,7 @@ export class WalletService {
         type: TransactionType.DEBIT,
         amount: transferData.amount,
         recipient_id: recipientAccount.id,
-        reference: reference!,
+        reference: debitReference!,
         status: TransactionStatus.COMPLETED,
         description: transferData.description || 'Fund transfer',
         created_at: new Date(),
@@ -275,7 +303,7 @@ export class WalletService {
         type: TransactionType.CREDIT,
         amount: transferData.amount,
         recipient_id: senderAccount.id,
-        reference: reference!,
+        reference: creditReference!,
         status: TransactionStatus.COMPLETED,
         description: transferData.description || 'Fund transfer',
         created_at: new Date(),
@@ -344,23 +372,27 @@ export class WalletService {
     }
 
     // Use database transaction for atomicity
-    const result = await db.transaction(async (trx) => {
+    const result = await db.transaction(async (trx: Knex.Transaction) => {
       // Generate unique transaction reference
       let reference: string;
       let referenceExists = true;
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 20; // Increased attempts for assessment
 
       while (referenceExists && attempts < maxAttempts) {
         reference = generateTransactionReference();
         const existingTransaction = await trx('transactions')
           .where({ reference })
           .first();
+        if (existingTransaction) {
+          console.warn(`Duplicate transaction reference generated: ${reference} (attempt ${attempts + 1})`);
+        }
         referenceExists = !!existingTransaction;
         attempts++;
       }
 
       if (referenceExists) {
+        console.error(`Failed to generate unique transaction reference after ${maxAttempts} attempts.`);
         throw new AppError('Unable to generate unique transaction reference', 500);
       }
 

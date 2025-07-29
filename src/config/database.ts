@@ -14,12 +14,12 @@ const config = {
     charset: 'utf8mb4',
   },
   pool: {
-    min: 2,
-    max: 10,
-    acquireTimeoutMillis: 60000,
+    min: 1,  // Reduced from 2
+    max: 5,  // Reduced from 10
+    acquireTimeoutMillis: 30000,  // Reduced from 60000
     createTimeoutMillis: 30000,
     destroyTimeoutMillis: 5000,
-    idleTimeoutMillis: 30000,
+    idleTimeoutMillis: 10000,  // Reduced from 30000
     reapIntervalMillis: 1000,
     createRetryIntervalMillis: 100,
     propagateCreateError: false,
@@ -31,8 +31,33 @@ const config = {
   seeds: {
     directory: './src/database/seeds',
   },
+  // Add debug for development
+  debug: process.env.NODE_ENV === 'development',
 };
 
-export const db = knex(config);
+// Create a single database instance
+let dbInstance: any = null;
+
+export const db = (() => {
+  if (!dbInstance) {
+    dbInstance = knex(config);
+    
+    // Handle connection errors
+    dbInstance.on('query-error', (error: any, obj: any) => {
+      console.error('Database query error:', error);
+    });
+  }
+  return dbInstance;
+})();
+
+// Graceful shutdown function
+export const closeDatabase = async () => {
+  if (dbInstance) {
+    console.log('Closing database connections...');
+    await dbInstance.destroy();
+    dbInstance = null;
+    console.log('Database connections closed');
+  }
+};
 
 export default config;

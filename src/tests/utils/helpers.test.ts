@@ -15,7 +15,9 @@ jest.mock("crypto")
 
 describe("Helpers", () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    jest.clearAllMocks();
+    // Mock crypto.randomUUID on the imported crypto module
+    mockedCrypto.randomUUID.mockReturnValue("123e4567-e89b-12d3-a456-426614174000");
   })
 
   describe("hashPassword", () => {
@@ -106,18 +108,11 @@ describe("Helpers", () => {
     })
 
     it("should generate transaction reference with prefix", () => {
-      jest.spyOn(Date, "now").mockReturnValue(1234567890123)
-      jest.spyOn(process, "hrtime").mockReturnValue({ bigint: () => BigInt("1234567890123456789") } as any)
-      mockedCrypto.randomBytes.mockReturnValue({
-        toString: jest.fn().mockReturnValue("abcd1234"),
-      } as any)
-
-      const result = helpers.generateTransactionReference()
-
-      expect(result.startsWith("TXN")).toBe(true)
-      expect(result).toContain("1234567890123")
-      expect(result).toContain("ABCD1234")
-    })
+      const result = helpers.generateTransactionReference();
+      expect(result.startsWith("TXN")).toBe(true);
+      // Check that the rest is a valid uppercase UUID without dashes
+      expect(result).toMatch(/^TXN[A-F0-9]{32}$/);
+    });
 
     it("should use default prefix if not configured", () => {
       delete process.env.TRANSACTION_REF_PREFIX

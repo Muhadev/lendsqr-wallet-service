@@ -84,3 +84,18 @@ export const paginationSchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20)
 });
+
+export const kycSubmissionSchema = Joi.object({
+  documentType: Joi.string().valid("national_id", "drivers_license", "passport", "voters_card").required().messages({
+    "any.only": "Document type must be one of: national_id, drivers_license, passport, voters_card",
+    "any.required": "Document type is required",
+  }),
+  documentNumber: Joi.string().min(5).max(50).required().messages({
+    "string.min": "Document number must be at least 5 characters",
+    "string.max": "Document number cannot exceed 50 characters",
+    "any.required": "Document number is required",
+  }),
+  documentUrl: Joi.string().uri().optional().messages({
+    "string.uri": "Document URL must be a valid URL",
+  }),
+})

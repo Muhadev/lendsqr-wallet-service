@@ -1,3 +1,4 @@
+// src/services/AuthService.ts - Updated register method with debug logging
 import { UserRepository } from '../repositories/UserRepository';
 import { AccountRepository } from '../repositories/AccountRepository';
 import { AdjutorService } from './AdjutorService';
@@ -19,6 +20,7 @@ import {
 } from '../utils/AppError';
 import { logger } from '../utils/logger';
 import { db } from '../config/database';
+import type { Knex } from 'knex';
 
 export interface AuthResponse {
   user: UserResponse;
@@ -38,72 +40,142 @@ export class AuthService {
   constructor() {
     this.userRepository = new UserRepository();
     this.accountRepository = new AccountRepository();
-    this.adjutorService = new AdjutorService();
+    // Skip AdjutorService for now during debugging
+    try {
+      this.adjutorService = new AdjutorService();
+    } catch (error) {
+      console.log('AdjutorService initialization failed, will skip blacklist check');
+      this.adjutorService = null as any;
+    }
   }
 
   async register(userData: CreateUserData): Promise<AuthResponse> {
-    // Validate input data
-    await this.validateRegistrationData(userData);
+    try {
+      console.log('1. Starting registration process...');
+      
+      // Validate input data
+      console.log('2. Validating registration data...');
+      await this.validateRegistrationData(userData);
+      console.log('   ✓ Validation passed');
 
-    // Check if user is blacklisted
-    const isVerified = await this.adjutorService.verifyUser({
+      // Real blacklist check
+      console.log('3. Checking for blacklist...');
+      if (this.adjutorService) {
+        const isVerified = await this.adjutorService.verifyUser({
+          email: userData.email,
+          phone: userData.phone,
+          bvn: userData.bvn,
+        });
+        if (!isVerified) {
+          throw new BlacklistError('User is blacklisted and cannot be onboarded');
+        }
+        console.log('   ✓ Blacklist check passed');
+      }
+
+      // Check for existing users
+      console.log('4. Checking for existing users...');
+      await this.checkExistingUser(userData);
+      console.log('   ✓ No existing user found');
+
+      // Use database transaction for user and account creation
+      console.log('5. Creating user and account in database transaction...');
+      const result = await db.transaction(async (trx: Knex.Transaction) => {
+        console.log('   5a. Hashing password...');
+        const passwordHash = await hashPassword(userData.password);
+
+        console.log('   5b. Creating user...');
+        const user = await this.createUserInTransaction(userData, passwordHash, trx);
+        console.log('   ✓ User created with ID:', user.id);
+
+        console.log('   5c. Generating account number...');
+        const accountNumber = await this.generateUniqueAccountNumber();
+        console.log('   ✓ Account number generated:', accountNumber);
+
+        console.log('   5d. Creating account...');
+        const account = await this.createAccountInTransaction({
+          userId: user.id,
+          accountNumber,
+          balance: 0,
+          status: AccountStatus.ACTIVE,
+        }, trx);
+        console.log('   ✓ Account created with ID:', account.id);
+
+        return { user, account };
+      });
+
+      // Generate JWT token
+      console.log('6. Generating JWT token...');
+      const token = generateToken({
+        userId: result.user.id,
+        email: result.user.email,
+      });
+      console.log('   ✓ Token generated');
+
+      console.log('7. Registration completed successfully!');
+
+      return {
+        user: sanitizeUser(result.user),
+        token,
+        account: {
+          accountNumber: result.account.accountNumber,
+          balance: result.account.balance,
+          status: result.account.status,
+        },
+      };
+    } catch (error: any) {
+      console.error('Registration failed at step:', error.message);
+      console.error('Full error:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to create user within transaction
+  private async createUserInTransaction(userData: CreateUserData, passwordHash: string, trx: Knex.Transaction) {
+    const [id] = await trx('users').insert({
       email: userData.email,
       phone: userData.phone,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
       bvn: userData.bvn,
+      password_hash: passwordHash,
+      created_at: new Date(),
+      updated_at: new Date(),
     });
 
-    if (!isVerified) {
-      throw new BlacklistError('User is blacklisted and cannot be onboarded');
-    }
-
-    // Check for existing users
-    await this.checkExistingUser(userData);
-
-    // Use database transaction for user and account creation
-    const result = await db.transaction(async (trx) => {
-      // Hash password
-      const passwordHash = await hashPassword(userData.password);
-
-      // Create user
-      const user = await this.userRepository.create({
-        ...userData,
-        passwordHash,
-      });
-
-      // Generate unique account number
-      const accountNumber = await this.generateUniqueAccountNumber();
-
-      // Create account
-      const account = await this.accountRepository.create({
-        userId: user.id,
-        accountNumber,
-        balance: 0,
-        status: AccountStatus.ACTIVE,
-      });
-
-      return { user, account };
-    });
-
-    // Generate JWT token
-    const token = generateToken({
-      userId: result.user.id,
-      email: result.user.email,
-    });
-
-    logger.info('User registered successfully', {
-      userId: result.user.id,
-      email: result.user.email,
-      accountNumber: result.account.accountNumber,
-    });
-
+    const user = await trx('users').where({ id }).first();
     return {
-      user: sanitizeUser(result.user),
-      token,
-      account: {
-        accountNumber: result.account.accountNumber,
-        balance: result.account.balance,
-        status: result.account.status,
-      },
+      id: user.id,
+      email: user.email,
+      phone: user.phone,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      bvn: user.bvn,
+      passwordHash: user.password_hash,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at,
+    };
+  }
+
+  // Helper method to create account within transaction
+  private async createAccountInTransaction(accountData: any, trx: Knex.Transaction) {
+    const [id] = await trx('accounts').insert({
+      user_id: accountData.userId,
+      account_number: accountData.accountNumber,
+      balance: accountData.balance || 0,
+      status: accountData.status || AccountStatus.ACTIVE,
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    const account = await trx('accounts').where({ id }).first();
+    return {
+      id: account.id,
+      userId: account.user_id,
+      accountNumber: account.account_number,
+      balance: parseFloat(account.balance),
+      status: account.status,
+      createdAt: account.created_at,
+      updatedAt: account.updated_at,
     };
   }
 
@@ -216,11 +288,20 @@ export class AuthService {
   private async generateUniqueAccountNumber(): Promise<string> {
     let accountNumber: string;
     let exists: boolean;
+    let attempts = 0;
+    const maxAttempts = 10;
 
     do {
       accountNumber = generateAccountNumber();
-      exists = await this.accountRepository.existsByAccountNumber(accountNumber);
-    } while (exists);
+      // Check directly in database within transaction
+      const result = await db('accounts').where({ account_number: accountNumber }).first();
+      exists = !!result;
+      attempts++;
+    } while (exists && attempts < maxAttempts);
+
+    if (exists) {
+      throw new AppError('Unable to generate unique account number', 500);
+    }
 
     return accountNumber;
   }

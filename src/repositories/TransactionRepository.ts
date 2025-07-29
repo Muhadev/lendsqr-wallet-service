@@ -1,11 +1,12 @@
 import { db } from '../config/database';
+import type { Knex } from 'knex';
 import { Transaction, CreateTransactionData, TransactionType, TransactionStatus } from '../models/Transaction';
 import { NotFoundError } from '../utils/AppError';
 
 export class TransactionRepository {
   private tableName = 'transactions';
 
-  async create(transactionData: CreateTransactionData, trx?: any): Promise<Transaction> {
+  async create(transactionData: CreateTransactionData, trx?: Knex.Transaction): Promise<Transaction> {
     const query = trx || db;
     
     const [id] = await query(this.tableName).insert({
@@ -28,10 +29,10 @@ export class TransactionRepository {
     return transaction;
   }
 
-  async findById(id: number, trx?: any): Promise<Transaction | null> {
+  async findById(id: number, trx?: Knex.Transaction): Promise<Transaction | null> {
     const query = trx || db;
     
-    const result = await query(this.tableName)
+    const result: any = await query(this.tableName)
       .where({ id })
       .first();
 
@@ -103,12 +104,12 @@ export class TransactionRepository {
       .limit(limit)
       .offset((page - 1) * limit);
 
-    const transactions = results.map(result => this.mapDbToModel(result));
+    const transactions = results.map((result: any) => this.mapDbToModel(result));
 
     return { transactions, totalCount };
   }
 
-  async updateStatus(id: number, status: TransactionStatus, trx?: any): Promise<Transaction> {
+  async updateStatus(id: number, status: TransactionStatus, trx?: Knex.Transaction): Promise<Transaction> {
     const query = trx || db;
     
     await query(this.tableName)
@@ -153,7 +154,7 @@ export class TransactionRepository {
     amount: number,
     reference: string,
     description: string,
-    trx?: any
+    trx?: Knex.Transaction
   ): Promise<{ debitTransaction: Transaction; creditTransaction: Transaction }> {
     // Create debit transaction for sender
     const debitTransaction = await this.create({
