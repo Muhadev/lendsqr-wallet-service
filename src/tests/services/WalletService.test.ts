@@ -15,6 +15,21 @@ import * as helpers from "../../utils/helpers";
 import { db } from "../../config/database";
 import { NotFoundError, ValidationError, InsufficientFundsError, AppError } from "../../utils/AppError";
 
+// Helper for Knex trx mock (moved to top level for all tests)
+type TrxQuery<T> = {
+  where: (arg: any) => { first: () => Promise<T | null> };
+  insert: (...args: any[]) => Promise<number[]>;
+};
+
+function makeTrxMock<T>(result: T | null): TrxQuery<T> {
+  return {
+    where: (arg: any) => ({
+      first: () => (arg && arg.id === 1 ? Promise.resolve(result) : Promise.resolve(null)),
+    }),
+    insert: jest.fn().mockResolvedValue([1]),
+  };
+}
+
 // Mock dependencies
 jest.mock("../../repositories/AccountRepository");
 jest.mock("../../repositories/TransactionRepository");
@@ -145,71 +160,38 @@ describe("WalletService", () => {
   });
 
   describe("fundAccount", () => {
+
     it("should fund account successfully", async () => {
       mockAccountRepository.findByUserId.mockResolvedValue(mockAccount);
-
-      // Mock db.transaction to call the callback and return its result
-      mockDb.transaction.mockImplementation(async (cb: any) => {
-        return cb({
-          // Simulate trx('transactions').where().first()
-          transactions: {
-            where: () => ({
-              first: () => null,
+      const trx = ((table: string) => {
+        if (table === "transactions") {
+          return makeTrxMock({
+            id: 1,
+            account_id: mockAccount.id,
+            type: TransactionType.CREDIT,
+            amount: 1000,
+            recipient_id: null,
+            reference: "TXN123456789",
+            status: TransactionStatus.COMPLETED,
+            description: "Account funding",
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+        }
+        if (table === "accounts") {
+          return {
+            where: (_: any) => ({
+              update: jest.fn().mockResolvedValue(undefined),
             }),
-            insert: () => [1],
-          },
-          accounts: {
-            where: () => ({
-              update: jest.fn(),
-            }),
-          },
-          // Simulate trx('transactions').where({id}).first()
-          "transactions.where": () => ({
-            first: () => ({
-              ...mockTransaction,
-              account_id: mockAccount.id,
-              amount: 1000,
-            }),
-          }),
-          // Simulate insert
-          insert: () => [1],
-        });
-      });
-
-      // Patch the callback to return the transaction
-      mockDb.transaction.mockImplementation(async (cb: any) => {
-        return cb({
-          // Simulate trx('transactions').where().first()
-          transactions: {
-            where: () => ({
-              first: () => null,
-            }),
-            insert: () => [1],
-          },
-          accounts: {
-            where: () => ({
-              update: jest.fn(),
-            }),
-          },
-          // Simulate insert
-          insert: () => [1],
-          // Simulate getting the created transaction
-          "transactions.where": () => ({
-            first: () => ({
-              id: 1,
-              account_id: mockAccount.id,
-              type: TransactionType.CREDIT,
-              amount: 1000,
-              recipient_id: null,
-              reference: "TXN123456789",
-              status: TransactionStatus.COMPLETED,
-              description: "Account funding",
-              created_at: new Date(),
-              updated_at: new Date(),
-            }),
-          }),
-        });
-      });
+            insert: jest.fn().mockResolvedValue([1]),
+          };
+        }
+        return {
+          where: (_: any) => ({ first: () => Promise.resolve(null) }),
+          insert: jest.fn().mockResolvedValue([1]),
+        };
+      }) as any;
+      mockDb.transaction.mockImplementation(async (cb: any) => cb(trx));
 
       const fundData: FundAccountData = { amount: 1000, description: "Account funding" };
       const result = await walletService.fundAccount(1, fundData);
@@ -230,40 +212,40 @@ describe("WalletService", () => {
   });
 
   describe("transferFunds", () => {
+
     it("should transfer funds successfully", async () => {
       mockAccountRepository.findByUserId.mockResolvedValue(mockAccount);
       mockAccountRepository.findByAccountNumber.mockResolvedValue(mockRecipientAccount);
 
-      mockDb.transaction.mockImplementation(async (cb: any) => {
-        return cb({
-          transactions: {
-            where: () => ({
-              first: () => null,
+      const trx = ((table: string) => {
+        if (table === "transactions") {
+          return makeTrxMock({
+            id: 1,
+            account_id: mockAccount.id,
+            type: TransactionType.DEBIT,
+            amount: 1000,
+            recipient_id: mockRecipientAccount.id,
+            reference: "TXN123456789",
+            status: TransactionStatus.COMPLETED,
+            description: "Fund transfer",
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+        }
+        if (table === "accounts") {
+          return {
+            where: (_: any) => ({
+              update: jest.fn().mockResolvedValue(undefined),
             }),
-            insert: () => [1],
-          },
-          accounts: {
-            where: () => ({
-              update: jest.fn(),
-            }),
-          },
-          insert: () => [1],
-          "transactions.where": () => ({
-            first: () => ({
-              id: 1,
-              account_id: mockAccount.id,
-              type: TransactionType.DEBIT,
-              amount: 1000,
-              recipient_id: mockRecipientAccount.id,
-              reference: "TXN123456789",
-              status: TransactionStatus.COMPLETED,
-              description: "Fund transfer",
-              created_at: new Date(),
-              updated_at: new Date(),
-            }),
-          }),
-        });
-      });
+            insert: jest.fn().mockResolvedValue([1]),
+          };
+        }
+        return {
+          where: (_: any) => ({ first: () => Promise.resolve(null) }),
+          insert: jest.fn().mockResolvedValue([1]),
+        };
+      }) as any;
+      mockDb.transaction.mockImplementation(async (cb: any) => cb(trx));
 
       const transferData: TransferData = {
         amount: 1000,
@@ -306,39 +288,39 @@ describe("WalletService", () => {
   });
 
   describe("withdrawFunds", () => {
+
     it("should withdraw funds successfully", async () => {
       mockAccountRepository.findByUserId.mockResolvedValue(mockAccount);
 
-      mockDb.transaction.mockImplementation(async (cb: any) => {
-        return cb({
-          transactions: {
-            where: () => ({
-              first: () => null,
+      const trx = ((table: string) => {
+        if (table === "transactions") {
+          return makeTrxMock({
+            id: 1,
+            account_id: mockAccount.id,
+            type: TransactionType.DEBIT,
+            amount: 1000,
+            recipient_id: null,
+            reference: "TXN123456789",
+            status: TransactionStatus.COMPLETED,
+            description: "Cash withdrawal",
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+        }
+        if (table === "accounts") {
+          return {
+            where: (_: any) => ({
+              update: jest.fn().mockResolvedValue(undefined),
             }),
-            insert: () => [1],
-          },
-          accounts: {
-            where: () => ({
-              update: jest.fn(),
-            }),
-          },
-          insert: () => [1],
-          "transactions.where": () => ({
-            first: () => ({
-              id: 1,
-              account_id: mockAccount.id,
-              type: TransactionType.DEBIT,
-              amount: 1000,
-              recipient_id: null,
-              reference: "TXN123456789",
-              status: TransactionStatus.COMPLETED,
-              description: "Cash withdrawal",
-              created_at: new Date(),
-              updated_at: new Date(),
-            }),
-          }),
-        });
-      });
+            insert: jest.fn().mockResolvedValue([1]),
+          };
+        }
+        return {
+          where: (_: any) => ({ first: () => Promise.resolve(null) }),
+          insert: jest.fn().mockResolvedValue([1]),
+        };
+      }) as any;
+      mockDb.transaction.mockImplementation(async (cb: any) => cb(trx));
 
       const withdrawData: WithdrawData = { amount: 1000, description: "Cash withdrawal" };
       const result = await walletService.withdrawFunds(1, withdrawData);

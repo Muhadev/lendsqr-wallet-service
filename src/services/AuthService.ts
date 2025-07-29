@@ -13,7 +13,7 @@ import {
 import { 
   AppError, 
   ValidationError, 
-  AuthenticationError, 
+  AuthenticationError,
   ConflictError,
   BlacklistError 
 } from '../utils/AppError';

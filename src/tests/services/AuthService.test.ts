@@ -1,4 +1,5 @@
-import { AuthService } from "../../services/AuthService"
+import { AuthService } from '../../services/AuthService';
+// ...existing code...
 import { UserRepository } from "../../repositories/UserRepository"
 import { AccountRepository } from "../../repositories/AccountRepository"
 import { AdjutorService } from "../../services/AdjutorService"

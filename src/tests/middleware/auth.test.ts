@@ -154,21 +154,23 @@ describe("Auth Middleware", () => {
     })
 
     it("should handle token expiration", async () => {
-      mockRequest.headers = {
-        authorization: "Bearer expired-token",
-      }
-      ;(jwt.verify as jest.Mock).mockImplementation(() => {
-        throw new jwt.TokenExpiredError("Token expired", new Date())
-      })
+  mockRequest.headers = {
+    authorization: "Bearer expired-token",
+  }
+  ;(jwt.verify as jest.Mock).mockImplementation(() => {
+    // Instead of new jwt.TokenExpiredError, use a plain error with the correct name
+    const err = new Error("Token expired");
+    (err as any).name = "TokenExpiredError";
+    throw err;
+  })
 
-      await authenticate(mockRequest as AuthenticatedRequest, mockResponse as Response, mockNext)
+  await authenticate(mockRequest as AuthenticatedRequest, mockResponse as Response, mockNext)
 
-      expect(mockNext).toHaveBeenCalledWith(expect.any(AppError))
-      const error = (mockNext as jest.Mock).mock.calls[0][0] as AppError // Fix: Type assertion
-      expect(error.message).toBe("Invalid token")
-      expect(error.statusCode).toBe(401)
-    })
-
+  expect(mockNext).toHaveBeenCalledWith(expect.any(AppError))
+  const error = (mockNext as jest.Mock).mock.calls[0][0] as AppError
+  expect(error.message).toBe("Invalid token")
+  expect(error.statusCode).toBe(401)
+})
     it("should handle malformed token", async () => {
       mockRequest.headers = {
         authorization: "Bearer malformed.token",

@@ -53,10 +53,17 @@ export const authenticate = async (
 
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      next(new AppError('Invalid token', 401));
+    if (
+      error instanceof jwt.JsonWebTokenError ||
+      (typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        typeof (error as any).name === "string" &&
+        (error as any).name.startsWith("TokenExpiredError"))
+    ) {
+      next(new AppError("Invalid token", 401));
     } else {
       next(error);
     }
-  }
-};
+      }
+    };
