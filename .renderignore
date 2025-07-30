@@ -1,0 +1,25 @@
+# Files to ignore during Render deployment
+node_modules/
+.git/
+.env
+.env.local
+.env.development
+.env.test
+*.log
+coverage/
+.nyc_output/
+.DS_Store
+Thumbs.db
+*.tgz
+*.tar.gz
+.cache/
+.parcel-cache/
+.next/
+out/
+build/
+dist/
+!dist/
+src/tests/
+*.test.ts
+*.spec.ts
+jest.config.js
