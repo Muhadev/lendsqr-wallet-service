@@ -4,7 +4,6 @@
   "description": "Lendsqr Wallet Service MVP",
   "main": "dist/server.js",
   "scripts": {
-    "preinstall": "npm install",
     "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
     "build": "tsc && cp knexfile.js dist/ && cp -r src/database dist/src/",
