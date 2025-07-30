@@ -5,8 +5,11 @@ node_modules/
 dist/
 build/
 
+knexfile.production.js
+
 package-lock.json
 # Environment variables
+.env.production
 .env
 .env.*   # optional: ignore all env variants like .env.local, .env.test
 

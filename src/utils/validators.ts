@@ -82,7 +82,9 @@ export const withdrawSchema = Joi.object({
 
 export const paginationSchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
-  limit: Joi.number().integer().min(1).max(100).default(20)
+  limit: Joi.number().integer().min(1).max(100).default(20),
+  type: Joi.string().optional(),
+  status: Joi.string().optional()
 });
 
 export const kycSubmissionSchema = Joi.object({
