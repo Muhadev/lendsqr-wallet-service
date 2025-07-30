@@ -488,4 +488,4 @@ When reporting issues, please include:
 
 ---
 
-**Built with ❤️ by the Muhadev**
+**Built with ❤️ by  Muhadev**
