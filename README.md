@@ -20,6 +20,11 @@ A robust, scalable wallet service built with Node.js, TypeScript, and MySQL. Thi
 - **Input Validation** - Comprehensive request validation using Joi
 - **Error Handling** - Centralized error handling with detailed logging
 
+
+> ℹ️ **Note on KYC Implementation**  
+A Know Your Customer (KYC) feature is currently under development as part of extended functionality. While not included in the original assessment requirements, this feature is being built and tested in the controller layer (`KYCController.ts`) and demonstrates proactive security integration.
+
+
 ### Security Features
 - **Password Hashing** - bcrypt with configurable salt rounds
 - **JWT Authentication** - Secure token-based authentication
@@ -37,6 +42,12 @@ A robust, scalable wallet service built with Node.js, TypeScript, and MySQL. Thi
 - **Database Migrations** - Knex.js migrations and seeding
 
 ## 🏗️ Architecture
+## 🗂️ Entity Relationship Diagram
+
+Below is the ER diagram that represents the relationship between `users`, `accounts`, and `transactions`.
+
+![ER Diagram](./public/assests/erbetter.png)
+
 
 ### Technology Stack
 - **Runtime**: Node.js 18.x
@@ -179,9 +190,15 @@ src/
    npm start
    \`\`\`
 
-The API will be available at `http://localhost:3000`
+The API will be available at `https://muhammedfayemi-lendsqr-be-test.onrender.com`
 
 ## 📚 API Documentation
+## 📬 Postman API Documentation
+
+For a complete and interactive experience with the API, visit the live Postman documentation:
+
+👉 **[Postman Collection Link](https://documenter.getpostman.com/view/26323710/2sB3B8sD7e)**  
+
 
 ### Base URL
 \`\`\`
@@ -471,4 +488,4 @@ When reporting issues, please include:
 
 ---
 
-**Built with ❤️ by the Lendsqr Team**
+**Built with ❤️ by the Muhadev**
