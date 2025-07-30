@@ -9,7 +9,7 @@ build/
 
 knexfile.production.js
 
-package-lock.json
+# package-lock.json
 # Environment variables
 .env.production
 .env
