@@ -1,11 +1,16 @@
 # Ignore environment variable files (never commit secrets)
 .env*
+
 # Node modules
 node_modules/
 
 # Output directories
 dist/
 build/
+
+# Bun files - IMPORTANT: Exclude these to avoid conflicts on Render
+bun.lockb
+.bun/
 
 knexfile.production.js
 

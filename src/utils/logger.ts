@@ -1,16 +1,15 @@
-import winston from "winston"
-// import { jest } from "@jest/globals"
+import winston from "winston";
 
 // Create a mock-friendly logger configuration
 const createLogger = () => {
   // In test environment, create a simple mock logger
   if (process.env.NODE_ENV === "test") {
     return {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    }
+      info: (...args: any[]) => console.log(...args),
+      error: (...args: any[]) => console.error(...args),
+      warn: (...args: any[]) => console.warn(...args),
+      debug: (...args: any[]) => console.debug(...args),
+    };
   }
 
   const logFormat = winston.format.combine(
@@ -23,9 +22,9 @@ const createLogger = () => {
         level,
         message,
         ...meta,
-      })
+      });
     }),
-  )
+  );
 
   const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || "info",
@@ -35,17 +34,17 @@ const createLogger = () => {
       new winston.transports.File({ filename: "logs/error.log", level: "error" }),
       new winston.transports.File({ filename: "logs/combined.log" }),
     ],
-  })
+  });
 
   if (process.env.NODE_ENV !== "production") {
     logger.add(
       new winston.transports.Console({
         format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
       }),
-    )
+    );
   }
 
-  return logger
-}
+  return logger;
+};
 
-export const logger = createLogger()
+export const logger = createLogger();
