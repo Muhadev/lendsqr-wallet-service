@@ -62,7 +62,7 @@ Below is the ER diagram that represents the relationship between `users`, `accou
 - **Security**: Helmet, bcryptjs, express-rate-limit
 
 ### Project Structure
-\`\`\`
+```
 src/
 ├── app.ts                 # Application entry point
 ├── config/
@@ -103,7 +103,7 @@ src/
     ├── repositories/
     ├── middleware/
     └── utils/
-\`\`\`
+```
 
 ## 🚦 Getting Started
 
@@ -116,10 +116,10 @@ src/
 ### Installation
 
 1. **Clone the repository**
-   \`\`\`bash
+   ```bash
    git clone https://github.com/your-org/lendsqr-wallet-service.git
    cd lendsqr-wallet-service
-   \`\`\`
+   ```
 
 2. **Install dependencies**
    \`\`\`bash
