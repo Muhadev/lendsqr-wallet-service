@@ -122,17 +122,17 @@ src/
    ```
 
 2. **Install dependencies**
-   \`\`\`bash
+   ```bash
    npm install
-   \`\`\`
+   ```
 
 3. **Environment setup**
-   \`\`\`bash
+   ```bash
    cp .env.example .env
-   \`\`\`
+   ```
    
    Configure your `.env` file:
-   \`\`\`env
+   ```env
    # Server Configuration
    NODE_ENV=development
    PORT=3000
@@ -165,10 +165,10 @@ src/
 
    # Logging
    LOG_LEVEL=info
-   \`\`\`
+   ```
 
 4. **Database setup**
-   \`\`\`bash
+   ```bash
    # Create database
    mysql -u root -p -e "CREATE DATABASE lendsqr_wallet;"
    mysql -u root -p -e "CREATE DATABASE lendsqr_wallet_test;"
@@ -178,17 +178,17 @@ src/
 
    # Seed database (optional)
    npm run seed
-   \`\`\`
+   ```
 
 5. **Start the application**
-   \`\`\`bash
+   ```bash
    # Development mode
    npm run dev
 
    # Production mode
    npm run build
    npm start
-   \`\`\`
+   ```
 
 The API will be available at `https://muhammedfayemi-lendsqr-be-test.onrender.com`
 
@@ -201,16 +201,16 @@ For a complete and interactive experience with the API, visit the live Postman d
 
 
 ### Base URL
-\`\`\`
+```
 Development: http://localhost:3000/api/v1
 Production: https://api.lendsqr.com/api/v1
-\`\`\`
+```
 
 ### Authentication
 All protected endpoints require a Bearer token:
-\`\`\`
+```
 Authorization: Bearer <your_jwt_token>
-\`\`\`
+```
 
 ### Endpoints Overview
 
@@ -236,7 +236,7 @@ Authorization: Bearer <your_jwt_token>
 ### Sample Requests
 
 #### User Registration
-\`\`\`bash
+```bash
 curl -X POST http://localhost:3000/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
@@ -247,10 +247,10 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
     "bvn": "12345678901",
     "password": "Password123!"
   }'
-\`\`\`
+```
 
 #### Fund Account
-\`\`\`bash
+```bash
 curl -X POST http://localhost:3000/api/v1/wallet/fund \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <your_token>" \
@@ -258,10 +258,10 @@ curl -X POST http://localhost:3000/api/v1/wallet/fund \
     "amount": 50000,
     "description": "Initial funding"
   }'
-\`\`\`
+```
 
 #### Transfer Funds
-\`\`\`bash
+```bash
 curl -X POST http://localhost:3000/api/v1/wallet/transfer \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <your_token>" \
@@ -270,14 +270,14 @@ curl -X POST http://localhost:3000/api/v1/wallet/transfer \
     "amount": 5000,
     "description": "Transfer to friend"
   }'
-\`\`\`
+```
 
 For complete API documentation with examples, import the Postman collection from `/postman/` directory.
 
 ## 🧪 Testing
 
 ### Running Tests
-\`\`\`bash
+```bash
 # Run all tests
 npm test
 
@@ -289,7 +289,7 @@ npm run test:watch
 
 # Run specific test file
 npm test -- AuthController.test.ts
-\`\`\`
+```
 
 ### Test Structure
 - **Unit Tests**: Individual component testing
@@ -309,7 +309,7 @@ The project maintains >95% test coverage across:
 ## 🔧 Development
 
 ### Available Scripts
-\`\`\`bash
+```bash
 npm run dev          # Start development server with hot reload
 npm run build        # Build for production
 npm start           # Start production server
@@ -320,10 +320,10 @@ npm run migrate:rollback # Rollback last migration
 npm run seed        # Seed database with test data
 npm run lint        # Run ESLint
 npm run lint:fix    # Fix ESLint issues
-\`\`\`
+```
 
 ### Database Operations
-\`\`\`bash
+```bash
 # Create new migration
 npx knex migrate:make migration_name
 
@@ -338,7 +338,7 @@ npx knex seed:make seed_name
 
 # Run seeds
 npm run seed
-\`\`\`
+```
 
 ### Code Quality
 - **ESLint**: Code linting and formatting
@@ -356,7 +356,7 @@ npm run seed
 4. Configure reverse proxy (nginx/Apache)
 
 ### Docker Deployment
-\`\`\`dockerfile
+```dockerfile
 # Dockerfile example
 FROM node:18-alpine
 WORKDIR /app
@@ -366,7 +366,7 @@ COPY . .
 RUN npm run build
 EXPOSE 3000
 CMD ["npm", "start"]
-\`\`\`
+```
 
 ### Production Checklist
 - [ ] Environment variables configured
