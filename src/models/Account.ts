@@ -1,3 +1,6 @@
+/**
+ * Represents a user account in the wallet system.
+ */
 export interface Account {
   id: number;
   userId: number;
@@ -8,12 +11,18 @@ export interface Account {
   updatedAt: Date;
 }
 
+/**
+ * Enum for possible account statuses.
+ */
 export enum AccountStatus {
   ACTIVE = 'active',
   INACTIVE = 'inactive',
   SUSPENDED = 'suspended',
 }
 
+/**
+ * Data required to create a new account.
+ */
 export interface CreateAccountData {
   userId: number;
   accountNumber: string;
@@ -21,6 +30,9 @@ export interface CreateAccountData {
   status?: AccountStatus;
 }
 
+/**
+ * Response shape for account-related API responses.
+ */
 export interface AccountResponse {
   id: number;
   accountNumber: string;

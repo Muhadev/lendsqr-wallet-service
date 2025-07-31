@@ -3,9 +3,18 @@ import type { Knex } from 'knex';
 import { Transaction, CreateTransactionData, TransactionType, TransactionStatus } from '../models/Transaction';
 import { NotFoundError } from '../utils/AppError';
 
+/**
+ * Repository for managing transaction data in the database.
+ */
 export class TransactionRepository {
   private tableName = 'transactions';
 
+  /**
+   * Create a new transaction.
+   * @param transactionData Data for the new transaction
+   * @param trx Optional transaction context
+   * @returns The created Transaction
+   */
   async create(transactionData: CreateTransactionData, trx?: Knex.Transaction): Promise<Transaction> {
     const query = trx || db;
     
@@ -29,6 +38,12 @@ export class TransactionRepository {
     return transaction;
   }
 
+  /**
+   * Find a transaction by its ID.
+   * @param id Transaction ID
+   * @param trx Optional transaction context
+   * @returns The Transaction or null if not found
+   */
   async findById(id: number, trx?: Knex.Transaction): Promise<Transaction | null> {
     const query = trx || db;
     
@@ -43,6 +58,11 @@ export class TransactionRepository {
     return this.mapDbToModel(result);
   }
 
+  /**
+   * Find a transaction by its reference.
+   * @param reference Transaction reference
+   * @returns The Transaction or null if not found
+   */
   async findByReference(reference: string): Promise<Transaction | null> {
     const result = await db(this.tableName)
       .where({ reference })
@@ -55,6 +75,12 @@ export class TransactionRepository {
     return this.mapDbToModel(result);
   }
 
+  /**
+   * Find transactions by account ID with optional filters and pagination.
+   * @param accountId Account ID
+   * @param options Filter and pagination options
+   * @returns Transactions and total count
+   */
   async findByAccountId(
     accountId: number,
     options: {
@@ -109,6 +135,13 @@ export class TransactionRepository {
     return { transactions, totalCount };
   }
 
+  /**
+   * Update the status of a transaction.
+   * @param id Transaction ID
+   * @param status New transaction status
+   * @param trx Optional transaction context
+   * @returns The updated Transaction
+   */
   async updateStatus(id: number, status: TransactionStatus, trx?: Knex.Transaction): Promise<Transaction> {
     const query = trx || db;
     
@@ -127,6 +160,11 @@ export class TransactionRepository {
     return transaction;
   }
 
+  /**
+   * Get a summary of completed transactions for an account.
+   * @param accountId Account ID
+   * @returns Summary of credits, debits, and transaction count
+   */
   async getAccountTransactionsSummary(accountId: number): Promise<{
     totalCredits: number;
     totalDebits: number;
@@ -148,6 +186,16 @@ export class TransactionRepository {
     };
   }
 
+  /**
+   * Create debit and credit transactions for a transfer.
+   * @param senderAccountId Sender's account ID
+   * @param recipientAccountId Recipient's account ID
+   * @param amount Amount to transfer
+   * @param reference Transaction reference
+   * @param description Transaction description
+   * @param trx Optional transaction context
+   * @returns Debit and credit transactions
+   */
   async createTransferTransactions(
     senderAccountId: number,
     recipientAccountId: number,
@@ -181,6 +229,11 @@ export class TransactionRepository {
     return { debitTransaction, creditTransaction };
   }
 
+  /**
+   * Delete a transaction by ID.
+   * @param id Transaction ID
+   * @returns True if deleted, false otherwise
+   */
   async delete(id: number): Promise<boolean> {
     const deletedCount = await db(this.tableName)
       .where({ id })
@@ -189,6 +242,11 @@ export class TransactionRepository {
     return deletedCount > 0;
   }
 
+  /**
+   * Map a database row to the Transaction model.
+   * @param dbResult Database row
+   * @returns Transaction model
+   */
   private mapDbToModel(dbResult: any): Transaction {
     return {
       id: dbResult.id,

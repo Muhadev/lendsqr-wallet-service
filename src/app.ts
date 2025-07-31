@@ -1,146 +1,182 @@
 // src/app.ts
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
+import express from "express"
+import cors from "cors"
+import helmet from "helmet"
+import morgan from "morgan"
+import dotenv from "dotenv"
 
 // Import routes
-import authRoutes from './routes/authRoutes';
-import walletRoutes from './routes/walletRoutes';
-import kycRoutes from './routes/kycRoutes';
+import authRoutes from "./routes/authRoutes"
+import walletRoutes from "./routes/walletRoutes"
+import kycRoutes from "./routes/kycRoutes"
 
 // Import middleware
-import { errorHandler } from './middleware/errorHandler';
-import { 
-  generalLimiter, 
-  authLimiter, 
-  transactionLimiter 
-} from './middleware/rateLimiter';
+import { errorHandler } from "./middleware/errorHandler"
+import { generalLimiter, authLimiter, transactionLimiter } from "./middleware/rateLimiter"
 
 // Import utilities
-import { logger } from './utils/logger';
+import { logger } from "./utils/logger"
 
-dotenv.config();
+dotenv.config()
 
-const app = express();
+/**
+ * Express application setup with security, logging, and routing configuration
+ */
+const app = express()
+
+// Validate required environment variables
+if (!process.env.API_VERSION) {
+  throw new Error("API_VERSION environment variable is required")
+}
 
 // Trust proxy for accurate IP addresses behind reverse proxy
-app.set('trust proxy', 1);
+app.set("trust proxy", 1)
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
     },
-  },
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true,
-    preload: true,
-  },
-}));
+    hsts: {
+      maxAge: Number.parseInt(process.env.HSTS_MAX_AGE || "31536000"),
+      includeSubDomains: true,
+      preload: true,
+    },
+  }),
+)
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.CLIENT_URL?.split(',') || []
-    : ['http://localhost:3000', 'http://localhost:3001'],
+  origin:
+    process.env.NODE_ENV === "production"
+      ? process.env.CLIENT_URL
+        ? process.env.CLIENT_URL.split(",")
+        : []
+      : ["http://localhost:3000", "http://localhost:3001"],
   credentials: true,
   optionsSuccessStatus: 200,
-};
+}
 
-app.use(cors(corsOptions));
+app.use(cors(corsOptions))
 
 // Request logging
-app.use(morgan('combined', {
-  stream: {
-    write: (message: string) => {
-      logger.info(message.trim());
+app.use(
+  morgan("combined", {
+    stream: {
+      write: (message: string) => {
+        logger.info(message.trim())
+      },
     },
-  },
-}));
+  }),
+)
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+const bodyLimit = process.env.BODY_LIMIT || "10mb"
+app.use(express.json({ limit: bodyLimit }))
+app.use(express.urlencoded({ extended: true, limit: bodyLimit }))
 
 // Apply general rate limiting to all requests
-app.use(generalLimiter);
+app.use(generalLimiter)
 
-// Health check endpoint (no rate limiting)
-app.get('/health', (req, res) => {
+/**
+ * Health check endpoint
+ */
+app.get("/health", (req, res) => {
   res.status(200).json({
-    status: 'success',
-    message: 'Lendsqr Wallet Service is running',
+    status: "success",
+    message: "Lendsqr Wallet Service is running",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV,
     version: process.env.API_VERSION,
-  });
-});
+  })
+})
 
-// API info endpoint
+/**
+ * API info endpoint
+ */
 app.get(`/api/${process.env.API_VERSION}`, (req, res) => {
+  const baseUrl = process.env.API_BASE_URL
+  const apiVersion = process.env.API_VERSION
+
   res.status(200).json({
-    status: 'success',
-    message: 'Lendsqr Wallet Service API',
-    version: process.env.API_VERSION,
-    documentation: `${process.env.API_BASE_URL}/docs`,
+    status: "success",
+    message: "Lendsqr Wallet Service API",
+    version: apiVersion,
+    documentation: baseUrl ? `${baseUrl}/docs` : undefined,
     endpoints: {
-      auth: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION}/auth`,
-      wallet: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION}/wallet`,
+      auth: `${baseUrl || ""}/api/${apiVersion}/auth`,
+      wallet: `${baseUrl || ""}/api/${apiVersion}/wallet`,
+      kyc: `${baseUrl || ""}/api/${apiVersion}/kyc`,
     },
-  });
-});
+  })
+})
 
 // Apply stricter rate limiting to auth routes
-app.use(`/api/${process.env.API_VERSION}/auth`, authLimiter);
+app.use(`/api/${process.env.API_VERSION}/auth`, authLimiter)
 
 // Apply transaction rate limiting to wallet routes
-app.use(`/api/${process.env.API_VERSION}/wallet`, transactionLimiter);
+app.use(`/api/${process.env.API_VERSION}/wallet`, transactionLimiter)
 
 // API routes
-app.use(`/api/${process.env.API_VERSION}/auth`, authRoutes);
-app.use(`/api/${process.env.API_VERSION}/wallet`, walletRoutes);
-app.use(`/api/${process.env.API_VERSION}/kyc`, kycRoutes);
+app.use(`/api/${process.env.API_VERSION}/auth`, authRoutes)
+app.use(`/api/${process.env.API_VERSION}/wallet`, walletRoutes)
+app.use(`/api/${process.env.API_VERSION}/kyc`, kycRoutes)
 
-// 404 handler for undefined routes
-app.use('*', (req, res) => {
+/**
+ * 404 handler for undefined routes
+ */
+app.use("*", (req, res) => {
+  logger.warn("Route not found", {
+    method: req.method,
+    url: req.originalUrl,
+    ip: req.ip,
+  })
+
   res.status(404).json({
-    status: 'error',
+    status: "error",
     message: `Route ${req.originalUrl} not found`,
-  });
-});
+  })
+})
 
 // Global error handler
-app.use(errorHandler);
+app.use(errorHandler)
 
-// Graceful shutdown handling
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+/**
+ * Graceful shutdown handling
+ */
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM received, shutting down gracefully")
+  process.exit(0)
+})
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+process.on("SIGINT", () => {
+  logger.info("SIGINT received, shutting down gracefully")
+  process.exit(0)
+})
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
+process.on("unhandledRejection", (reason: any, promise: Promise<any>) => {
+  logger.error("Unhandled Promise Rejection", {
+    reason: reason?.message || reason,
+    promise: promise.toString(),
+  })
+  process.exit(1)
+})
 
 // Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-  process.exit(1);
-});
+process.on("uncaughtException", (error: Error) => {
+  logger.error("Uncaught Exception", {
+    error: error.message,
+    stack: error.stack,
+  })
+  process.exit(1)
+})
 
-export default app;
+export default app

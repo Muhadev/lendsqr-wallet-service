@@ -82,7 +82,7 @@ describe("Helpers", () => {
       delete process.env.JWT_SECRET
       const payload = { userId: 1 }
 
-      expect(() => helpers.generateToken(payload)).toThrow("JWT_SECRET is not configured")
+      expect(() => helpers.generateToken(payload)).toThrow("JWT_SECRET environment variable is required")
     })
   })
 

@@ -1,27 +1,54 @@
 import knex from 'knex';
-import dotenv from 'dotenv';
+import { logger } from '../utils/logger';
 
-dotenv.config();
+/**
+ * Database configuration and connection management
+ * Provides a singleton database instance with proper error handling
+ */
+
+// Required environment variables for database connection
+const requiredEnvVars = [
+  'DB_HOST',
+  'DB_PORT', 
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_NAME',
+  'DB_POOL_MIN',
+  'DB_POOL_MAX',
+  'DB_ACQUIRE_TIMEOUT',
+  'DB_CREATE_TIMEOUT',
+  'DB_DESTROY_TIMEOUT',
+  'DB_IDLE_TIMEOUT',
+  'DB_REAP_INTERVAL',
+  'DB_CREATE_RETRY_INTERVAL'
+];
+
+// Validate required environment variables
+requiredEnvVars.forEach((envVar) => {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+});
 
 const config = {
   client: 'mysql2',
   connection: {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306'),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'lendsqr_wallet',
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT!),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     charset: 'utf8mb4',
   },
   pool: {
-    min: 1,  // Reduced from 2
-    max: 5,  // Reduced from 10
-    acquireTimeoutMillis: 30000,  // Reduced from 60000
-    createTimeoutMillis: 30000,
-    destroyTimeoutMillis: 5000,
-    idleTimeoutMillis: 10000,  // Reduced from 30000
-    reapIntervalMillis: 1000,
-    createRetryIntervalMillis: 100,
+    min: parseInt(process.env.DB_POOL_MIN!),
+    max: parseInt(process.env.DB_POOL_MAX!),
+    acquireTimeoutMillis: parseInt(process.env.DB_ACQUIRE_TIMEOUT!),
+    createTimeoutMillis: parseInt(process.env.DB_CREATE_TIMEOUT!),
+    destroyTimeoutMillis: parseInt(process.env.DB_DESTROY_TIMEOUT!),
+    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT!),
+    reapIntervalMillis: parseInt(process.env.DB_REAP_INTERVAL!),
+    createRetryIntervalMillis: parseInt(process.env.DB_CREATE_RETRY_INTERVAL!),
     propagateCreateError: false,
   },
   migrations: {
@@ -31,32 +58,38 @@ const config = {
   seeds: {
     directory: './src/database/seeds',
   },
-  // Add debug for development
   debug: process.env.NODE_ENV === 'development',
 };
 
 // Create a single database instance
 let dbInstance: any = null;
 
+/**
+ * Get database instance (singleton pattern)
+ * @returns {knex.Knex} Database instance
+ */
 export const db = (() => {
   if (!dbInstance) {
     dbInstance = knex(config);
     
     // Handle connection errors
     dbInstance.on('query-error', (error: any, obj: any) => {
-      console.error('Database query error:', error);
+      logger.error('Database query error:', { error: error.message, query: obj.sql });
     });
   }
   return dbInstance;
 })();
 
-// Graceful shutdown function
-export const closeDatabase = async () => {
+/**
+ * Gracefully close database connections
+ * @returns {Promise<void>}
+ */
+export const closeDatabase = async (): Promise<void> => {
   if (dbInstance) {
-    console.log('Closing database connections...');
+    logger.info('Closing database connections...');
     await dbInstance.destroy();
     dbInstance = null;
-    console.log('Database connections closed');
+    logger.info('Database connections closed');
   }
 };
 

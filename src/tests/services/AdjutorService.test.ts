@@ -6,7 +6,6 @@ import { jest } from "@jest/globals"
 jest.mock("axios")
 const mockedAxios = axios as jest.Mocked<typeof axios>
 
-// Fix: Define custom error interface
 interface CustomError extends Error {
   code?: string
   response?: {
@@ -20,10 +19,13 @@ describe("AdjutorService", () => {
   let mockAxiosInstance: any
 
   beforeEach(() => {
-    // Mock environment variables
+    // Set required env vars for each test
     process.env.ADJUTOR_API_URL = "https://test-adjutor.com/v2"
     process.env.ADJUTOR_API_KEY = "test-api-key"
     process.env.ADJUTOR_API_TIMEOUT = "5000"
+    process.env.KARMA_ENDPOINT = "/test"
+    process.env.KARMA_MAX_CONCURRENT_REQUESTS = "3"
+    process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = "false"
 
     mockAxiosInstance = {
       post: jest.fn(),
@@ -43,13 +45,18 @@ describe("AdjutorService", () => {
     delete process.env.ADJUTOR_API_URL
     delete process.env.ADJUTOR_API_KEY
     delete process.env.ADJUTOR_API_TIMEOUT
+    delete process.env.KARMA_ENDPOINT
+    delete process.env.KARMA_MAX_CONCURRENT_REQUESTS
+    delete process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE
   })
 
   describe("constructor", () => {
     it("should throw AppError if API key is not configured", () => {
       delete process.env.ADJUTOR_API_KEY
-
-      expect(() => new AdjutorService()).toThrow(AppError)
+      jest.resetModules()
+      expect(() => {
+        require("../../services/AdjutorService")
+      }).toThrow("Missing required environment variable: ADJUTOR_API_KEY")
     })
 
     it("should create axios instance with correct configuration", () => {
@@ -64,7 +71,6 @@ describe("AdjutorService", () => {
       })
     })
   })
-
   describe("checkKarmaBlacklist", () => {
     const mockIdentity: KarmaIdentity = {
       identity_number: "12345678901",
@@ -84,7 +90,7 @@ describe("AdjutorService", () => {
 
       const result = await adjutorService.checkKarmaBlacklist(mockIdentity)
 
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith("/verification/karma", mockIdentity)
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith(process.env.KARMA_ENDPOINT, mockIdentity)
       expect(result).toEqual({
         status: false,
         message: "User is not blacklisted",
@@ -117,7 +123,6 @@ describe("AdjutorService", () => {
     })
 
     it("should handle API connection errors gracefully", async () => {
-      // Fix: Create proper error object with code property
       const error: CustomError = new Error("Connection refused")
       error.code = "ECONNREFUSED"
       mockAxiosInstance.post.mockRejectedValue(error)
