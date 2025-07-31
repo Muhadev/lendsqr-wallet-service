@@ -1,15 +1,9 @@
 import winston from "winston";
 
-// Create a mock-friendly logger configuration
 const createLogger = () => {
-  // In test environment, create a simple mock logger
   if (process.env.NODE_ENV === "test") {
-    return {
-      info: (...args: any[]) => console.log(...args),
-      error: (...args: any[]) => console.error(...args),
-      warn: (...args: any[]) => console.warn(...args),
-      debug: (...args: any[]) => console.debug(...args),
-    };
+    // Use a silent logger for tests
+    return winston.createLogger({ silent: true });
   }
 
   const logFormat = winston.format.combine(

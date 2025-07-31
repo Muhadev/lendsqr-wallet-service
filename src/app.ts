@@ -80,34 +80,34 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV,
-    version: process.env.API_VERSION || '1.0.0',
+    version: process.env.API_VERSION,
   });
 });
 
 // API info endpoint
-app.get(`/api/${process.env.API_VERSION || 'v1'}`, (req, res) => {
+app.get(`/api/${process.env.API_VERSION}`, (req, res) => {
   res.status(200).json({
     status: 'success',
     message: 'Lendsqr Wallet Service API',
-    version: process.env.API_VERSION || '1.0.0',
+    version: process.env.API_VERSION,
     documentation: `${process.env.API_BASE_URL}/docs`,
     endpoints: {
-      auth: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION || 'v1'}/auth`,
-      wallet: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION || 'v1'}/wallet`,
+      auth: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION}/auth`,
+      wallet: `${process.env.API_BASE_URL}/api/${process.env.API_VERSION}/wallet`,
     },
   });
 });
 
 // Apply stricter rate limiting to auth routes
-app.use(`/api/${process.env.API_VERSION || 'v1'}/auth`, authLimiter);
+app.use(`/api/${process.env.API_VERSION}/auth`, authLimiter);
 
 // Apply transaction rate limiting to wallet routes
-app.use(`/api/${process.env.API_VERSION || 'v1'}/wallet`, transactionLimiter);
+app.use(`/api/${process.env.API_VERSION}/wallet`, transactionLimiter);
 
 // API routes
-app.use(`/api/${process.env.API_VERSION || 'v1'}/auth`, authRoutes);
-app.use(`/api/${process.env.API_VERSION || 'v1'}/wallet`, walletRoutes);
-app.use(`/api/${process.env.API_VERSION || 'v1'}/kyc`, kycRoutes);
+app.use(`/api/${process.env.API_VERSION}/auth`, authRoutes);
+app.use(`/api/${process.env.API_VERSION}/wallet`, walletRoutes);
+app.use(`/api/${process.env.API_VERSION}/kyc`, kycRoutes);
 
 // 404 handler for undefined routes
 app.use('*', (req, res) => {
