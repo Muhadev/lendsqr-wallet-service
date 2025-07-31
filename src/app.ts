@@ -77,7 +77,12 @@ app.use(
 )
 
 // Body parsing middleware
-const bodyLimit = process.env.BODY_LIMIT || "10mb"
+// Body limit
+if (!process.env.BODY_LIMIT) {
+  throw new Error("BODY_LIMIT environment variable is required");
+}
+const bodyLimit = process.env.BODY_LIMIT;
+
 app.use(express.json({ limit: bodyLimit }))
 app.use(express.urlencoded({ extended: true, limit: bodyLimit }))
 

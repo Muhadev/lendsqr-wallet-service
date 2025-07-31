@@ -44,11 +44,14 @@ export const authenticate = async (
     }
 
     const jwtSecret = process.env.JWT_SECRET;
+    console.log("JWT_SECRET:", jwtSecret)
+    console.log("Token:", token)
     if (!jwtSecret) {
       throw new AppError('JWT secret not configured', 500);
     }
 
     const decoded = jwt.verify(token, jwtSecret) as any;
+    console.log("Decoded:", decoded)
 
     const userRepository = new UserRepository();
     const user = await userRepository.findById(decoded.userId);
@@ -66,6 +69,7 @@ export const authenticate = async (
 
     next();
   } catch (error) {
+    console.error("JWT verification error:", error)
     if (
       error instanceof jwt.JsonWebTokenError ||
       (typeof error === "object" &&

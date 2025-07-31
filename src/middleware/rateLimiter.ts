@@ -6,8 +6,8 @@ import type { Request } from "express"
  * General API rate limiter for all endpoints
  */
 export const generalLimiter = rateLimit({
-  windowMs: Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000"), // 15 minutes
-  max: Number.parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "100"),
+  windowMs: Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS!), // 15 minutes
+  max: Number.parseInt(process.env.RATE_LIMIT_MAX_REQUESTS!),
   message: {
     status: "error",
     message: "Too many requests from this IP, please try again later.",
@@ -20,8 +20,8 @@ export const generalLimiter = rateLimit({
  * Strict rate limiter for authentication endpoints
  */
 export const authLimiter = rateLimit({
-  windowMs: Number.parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || "900000"), // 15 minutes
-  max: Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS || "5"),
+  windowMs: Number.parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS!), // 15 minutes
+  max: Number.parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS!),
   message: {
     status: "error",
     message: "Too many authentication attempts, please try again later.",
@@ -35,8 +35,8 @@ export const authLimiter = rateLimit({
  * Transaction rate limiter for wallet operations
  */
 export const transactionLimiter = rateLimit({
-  windowMs: Number.parseInt(process.env.TRANSACTION_RATE_LIMIT_WINDOW_MS || "60000"), // 1 minute
-  max: Number.parseInt(process.env.TRANSACTION_RATE_LIMIT_MAX_REQUESTS || "10"),
+  windowMs: Number.parseInt(process.env.TRANSACTION_RATE_LIMIT_WINDOW_MS!), // 1 minute
+  max: Number.parseInt(process.env.TRANSACTION_RATE_LIMIT_MAX_REQUESTS!),
   message: {
     status: "error",
     message: "Too many transaction requests, please try again later.",
@@ -72,6 +72,6 @@ export const createUserBasedLimiter = (windowMs: number, max: number) => {
  * User-specific transaction limiter
  */
 export const userTransactionLimiter = createUserBasedLimiter(
-  Number.parseInt(process.env.USER_TRANSACTION_RATE_LIMIT_WINDOW_MS || "60000"), // 1 minute
-  Number.parseInt(process.env.USER_TRANSACTION_RATE_LIMIT_MAX_REQUESTS || "5"), // 5 transactions per minute per user
+  Number.parseInt(process.env.USER_TRANSACTION_RATE_LIMIT_WINDOW_MS!), // 1 minute
+  Number.parseInt(process.env.USER_TRANSACTION_RATE_LIMIT_MAX_REQUESTS!), // 5 transactions per minute per user
 )

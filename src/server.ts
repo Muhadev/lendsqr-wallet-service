@@ -1,14 +1,14 @@
-import dotenv from "dotenv"
+import dotenv from "dotenv";
 
 // Load environment variables first
-dotenv.config()
+dotenv.config();
 
-import app from "./app"
-import { db, closeDatabase } from "./config/database"
-import { logger } from "./utils/logger"
+import app from "./app";
+import { db, closeDatabase } from "./config/database";
+import { logger } from "./utils/logger";
 
 /**
- * Required environment variables for the application
+ * List of required environment variables for the application to run.
  */
 const requiredEnvs = [
   "PORT",
@@ -20,125 +20,132 @@ const requiredEnvs = [
   "JWT_SECRET",
   "ADJUTOR_API_URL",
   "ADJUTOR_API_KEY",
-]
+];
 
 /**
- * Validate all required environment variables are present
+ * Validate all required environment variables are present.
+ * Exits the process if any are missing.
  */
 const validateEnvironmentVariables = (): void => {
-  const missingEnvs = requiredEnvs.filter((env) => !process.env[env])
-
+  const missingEnvs = requiredEnvs.filter((env) => !process.env[env]);
   if (missingEnvs.length > 0) {
     logger.error("Missing required environment variables", {
       missingVariables: missingEnvs,
-    })
-    process.exit(1)
+    });
+    process.exit(1);
   }
-}
+};
 
-// Track if server is shutting down
-let isShuttingDown = false
+let isShuttingDown = false;
 
 /**
- * Start the server with proper error handling and graceful shutdown
+ * Start the server with proper error handling and graceful shutdown.
+ * - Validates environment variables.
+ * - Tests database connection.
+ * - Starts the HTTP server.
+ * - Handles graceful shutdown on signals.
  */
 const startServer = async (): Promise<void> => {
   try {
-    // Validate environment variables
-    validateEnvironmentVariables()
+    validateEnvironmentVariables();
 
-    const PORT = process.env.PORT!
+    const PORT = process.env.PORT!;
+    const API_VERSION = process.env.API_VERSION!;
+    const API_BASE_URL = process.env.API_BASE_URL!;
+    const SHUTDOWN_TIMEOUT_ENV = process.env.SHUTDOWN_TIMEOUT;
+    if (!SHUTDOWN_TIMEOUT_ENV) {
+      logger.error("Missing required environment variable: SHUTDOWN_TIMEOUT");
+      process.exit(1);
+    }
+    const SHUTDOWN_TIMEOUT = Number.parseInt(SHUTDOWN_TIMEOUT_ENV);
 
     logger.info("Starting Lendsqr Wallet Service", {
       environment: process.env.NODE_ENV,
       port: PORT,
-      version: process.env.API_VERSION || "1.0.0",
-    })
+      version: API_VERSION,
+    });
 
     // Test database connection
-    logger.info("Testing database connection...")
-    await db.raw("SELECT 1+1 as result")
-    logger.info("Database connection successful")
+    logger.info("Testing database connection...");
+    await db.raw("SELECT 1+1 as result");
+    logger.info("Database connection successful");
 
     // Start the server
     const server = app.listen(PORT, () => {
       logger.info("Server started successfully", {
         port: PORT,
-        healthCheck: `http://localhost:${PORT}/health`,
-        apiBase: `http://localhost:${PORT}/api/v1`,
-      })
-    })
+        healthCheck: `${API_BASE_URL}/health`,
+        apiBase: `${API_BASE_URL}/api/${API_VERSION}`,
+      });
+    });
 
     /**
-     * Graceful shutdown handler
+     * Graceful shutdown handler.
+     * @param signal - Signal that triggered the shutdown
      */
     const gracefulShutdown = async (signal: string): Promise<void> => {
-      if (isShuttingDown) return
-      isShuttingDown = true
+      if (isShuttingDown) return;
+      isShuttingDown = true;
 
-      logger.info("Graceful shutdown initiated", { signal })
+      logger.info("Graceful shutdown initiated", { signal });
 
-      // Stop accepting new connections
       server.close(async () => {
-        logger.info("HTTP server closed")
-
+        logger.info("HTTP server closed");
         try {
-          // Close database connections
-          await closeDatabase()
-          logger.info("Graceful shutdown completed successfully")
-          process.exit(0)
+          await closeDatabase();
+          logger.info("Graceful shutdown completed successfully");
+          process.exit(0);
         } catch (error: any) {
-          logger.error("Error during shutdown", { error: error.message })
-          process.exit(1)
+          logger.error("Error during shutdown", { error: error.message });
+          process.exit(1);
         }
-      })
+      });
 
-      // Force close after timeout
-      const shutdownTimeout = Number.parseInt(process.env.SHUTDOWN_TIMEOUT || "10000")
       setTimeout(() => {
-        logger.error("Forced shutdown due to timeout", { timeout: shutdownTimeout })
-        process.exit(1)
-      }, shutdownTimeout)
-    }
+        logger.error("Forced shutdown due to timeout", { timeout: SHUTDOWN_TIMEOUT });
+        process.exit(1);
+      }, SHUTDOWN_TIMEOUT);
+    };
 
-    // Handle different shutdown signals
-    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"))
-    process.on("SIGINT", () => gracefulShutdown("SIGINT"))
-
-    // Handle nodemon restart
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     process.once("SIGUSR2", async () => {
-      await gracefulShutdown("SIGUSR2 (nodemon restart)")
-      process.kill(process.pid, "SIGUSR2")
-    })
+      await gracefulShutdown("SIGUSR2 (nodemon restart)");
+      process.kill(process.pid, "SIGUSR2");
+    });
   } catch (error: any) {
     logger.error("Failed to start server", {
       error: error.message,
       stack: error.stack,
-    })
-    await closeDatabase()
-    process.exit(1)
+    });
+    await closeDatabase();
+    process.exit(1);
   }
-}
+};
 
-// Handle unhandled promise rejections
+/**
+ * Handle unhandled promise rejections.
+ */
 process.on("unhandledRejection", async (reason: any, promise: Promise<any>) => {
   logger.error("Unhandled Promise Rejection", {
     reason: reason?.message || reason,
     promise: promise.toString(),
-  })
-  await closeDatabase()
-  process.exit(1)
-})
+  });
+  await closeDatabase();
+  process.exit(1);
+});
 
-// Handle uncaught exceptions
+/**
+ * Handle uncaught exceptions.
+ */
 process.on("uncaughtException", async (error: Error) => {
   logger.error("Uncaught Exception", {
     error: error.message,
     stack: error.stack,
-  })
-  await closeDatabase()
-  process.exit(1)
-})
+  });
+  await closeDatabase();
+  process.exit(1);
+});
 
 // Start the server
-startServer()
+startServer();
