@@ -72,20 +72,8 @@ export class AuthService {
           email: userData.email,
           error: error.message
         })
-        
-        // Check if we should allow registration on Karma failure
-        const allowOnFailure = process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE === 'true'
-        
-        if (allowOnFailure) {
-          logger.warn("Proceeding with registration despite Karma verification failure", {
-            email: userData.email,
-            reason: "ALLOW_REGISTRATION_ON_KARMA_FAILURE is enabled"
-          })
-        } else {
-          throw error // Re-throw the original error
+          throw error // No fallback, always deny registration
         }
-      }
-
       // Continue with the rest of your registration logic...
       await this.checkExistingUser(userData)
       logger.debug("Existing user check passed", { email: userData.email })
