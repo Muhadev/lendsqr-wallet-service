@@ -10,7 +10,7 @@ import crypto from "crypto"
  * @returns Promise<string> - Hashed password
  */
 export const hashPassword = async (password: string): Promise<string> => {
-  const saltRounds = Number.parseInt(process.env.BCRYPT_SALT_ROUNDS || "12")
+  const saltRounds = Number.parseInt(process.env.BCRYPT_SALT_ROUNDS!)
   return bcrypt.hash(password, saltRounds)
 }
 

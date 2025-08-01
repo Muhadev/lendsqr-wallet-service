@@ -10,7 +10,6 @@ export interface KarmaIdentity {
 const requiredAdjutorEnvs = [
   "KARMA_MAX_CONCURRENT_REQUESTS",
   "KARMA_ENDPOINT",
-  "ALLOW_REGISTRATION_ON_KARMA_FAILURE",
   "ADJUTOR_API_URL",
   "ADJUTOR_API_KEY",
   "ADJUTOR_API_TIMEOUT"
@@ -43,7 +42,6 @@ export class AdjutorService {
   private timeout: number
   private maxConcurrent: number
   private endpoint: string
-  private allowOnFailure: boolean
 
   constructor() {
     this.baseURL = process.env.ADJUTOR_API_URL!
@@ -51,7 +49,6 @@ export class AdjutorService {
     this.timeout = Number.parseInt(process.env.ADJUTOR_API_TIMEOUT!)
     this.maxConcurrent = Number.parseInt(process.env.KARMA_MAX_CONCURRENT_REQUESTS!)
     this.endpoint = process.env.KARMA_ENDPOINT!
-    this.allowOnFailure = process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE === "true"
 
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -124,29 +121,8 @@ export class AdjutorService {
         error: error.response?.data?.message || error.message,
       })
 
-      // If API is down, we'll allow user registration but log the issue
-      if (error.code === "ECONNREFUSED" || error.response?.status === 503) {
-        logger.warn("Adjutor API unavailable, allowing registration")
-        return {
-          status: false,
-          message: "Blacklist check temporarily unavailable",
-        }
-      }
-
-      // For other errors, we'll be more restrictive
-      if (error.response?.status === 401) {
-        throw new AppError("Invalid API credentials", 500)
-      }
-
-      if (error.response?.status === 429) {
-        throw new AppError("Too many requests to verification service", 429)
-      }
-
-      // Default to allowing registration if we can't verify
-      return {
-        status: false,
-        message: "Blacklist verification completed",
-      }
+      // Do not allow registration if blacklist check fails for any reason
+      throw new AppError("Unable to verify blacklist status. Registration denied.", 503)
     }
   }
 
@@ -170,10 +146,8 @@ export class AdjutorService {
           logger.error(`Karma check failed for identity ${i + index}`, {
             error: result.reason?.message,
           })
-          results.push({
-            status: false,
-            message: "Verification failed",
-          })
+          // Do not allow registration if any check fails
+          throw new AppError("Unable to verify blacklist status. Registration denied.", 503)
         }
       })
     }
@@ -197,42 +171,28 @@ export class AdjutorService {
       { identity_number: userData.email, identity_type: "EMAIL" },
     ]
 
-    try {
-      const results = await this.checkMultipleIdentities(identities)
+    const results = await this.checkMultipleIdentities(identities)
 
-      // If any identity is blacklisted, reject the user
-      const isBlacklisted = results.some((result) => result.status === true)
+    // If any identity is blacklisted, reject the user
+    const isBlacklisted = results.some((result) => result.status === true)
 
-      if (isBlacklisted) {
-        const blacklistedIdentities = results
-          .filter((result) => result.status === true)
-          .map((result, index) => identities[index].identity_type)
+    if (isBlacklisted) {
+      const blacklistedIdentities = results
+        .filter((result) => result.status === true)
+        .map((result, index) => identities[index].identity_type)
 
-        logger.warn("User failed blacklist verification", {
-          email: userData.email,
-          blacklisted_identities: blacklistedIdentities,
-        })
-
-        return false
-      }
-
-      logger.info("User passed blacklist verification", {
+      logger.warn("User failed blacklist verification", {
         email: userData.email,
+        blacklisted_identities: blacklistedIdentities,
       })
 
-      return true
-    } catch (error: any) {
-      logger.error("User verification process failed", {
-        error: error.message,
-        email: userData.email,
-      })
-
-      // In case of service failure, use the validated config value
-      if (this.allowOnFailure) {
-        logger.warn("Allowing registration despite verification failure due to configuration")
-      }
-
-      return this.allowOnFailure
+      return false
     }
+
+    logger.info("User passed blacklist verification", {
+      email: userData.email,
+    })
+
+    return true
   }
 }

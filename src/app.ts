@@ -1,4 +1,3 @@
-// src/app.ts
 import express from "express"
 import cors from "cors"
 import helmet from "helmet"
@@ -19,15 +18,22 @@ import { logger } from "./utils/logger"
 
 dotenv.config()
 
-/**
- * Express application setup with security, logging, and routing configuration
- */
 const app = express()
 
 // Validate required environment variables
-if (!process.env.API_VERSION) {
-  throw new Error("API_VERSION environment variable is required")
-}
+const requiredEnvs = [
+  "API_VERSION",
+  "BODY_LIMIT",
+  "NODE_ENV",
+  "CLIENT_URL",
+  "HSTS_MAX_AGE",
+  "API_BASE_URL"
+]
+requiredEnvs.forEach((env) => {
+  if (!process.env[env]) {
+    throw new Error(`${env} environment variable is required`)
+  }
+})
 
 // Trust proxy for accurate IP addresses behind reverse proxy
 app.set("trust proxy", 1)
@@ -44,21 +50,23 @@ app.use(
       },
     },
     hsts: {
-      maxAge: Number.parseInt(process.env.HSTS_MAX_AGE || "31536000"),
+      maxAge: Number.parseInt(process.env.HSTS_MAX_AGE!),
       includeSubDomains: true,
       preload: true,
     },
   }),
 )
 
-// CORS configuration
+// CORS configuration (no hardcoded URLs)
+const clientUrls =
+  process.env.CLIENT_URL?.split(",").map((url) => url.trim()).filter(Boolean) || []
+
+if (clientUrls.length === 0) {
+  throw new Error("CLIENT_URL environment variable is required for CORS configuration")
+}
+
 const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? process.env.CLIENT_URL
-        ? process.env.CLIENT_URL.split(",")
-        : []
-      : ["http://localhost:3000", "http://localhost:3001"],
+  origin: clientUrls,
   credentials: true,
   optionsSuccessStatus: 200,
 }
@@ -77,12 +85,7 @@ app.use(
 )
 
 // Body parsing middleware
-// Body limit
-if (!process.env.BODY_LIMIT) {
-  throw new Error("BODY_LIMIT environment variable is required");
-}
-const bodyLimit = process.env.BODY_LIMIT;
-
+const bodyLimit = process.env.BODY_LIMIT!
 app.use(express.json({ limit: bodyLimit }))
 app.use(express.urlencoded({ extended: true, limit: bodyLimit }))
 
@@ -116,9 +119,9 @@ app.get(`/api/${process.env.API_VERSION}`, (req, res) => {
     version: apiVersion,
     documentation: baseUrl ? `${baseUrl}/docs` : undefined,
     endpoints: {
-      auth: `${baseUrl || ""}/api/${apiVersion}/auth`,
-      wallet: `${baseUrl || ""}/api/${apiVersion}/wallet`,
-      kyc: `${baseUrl || ""}/api/${apiVersion}/kyc`,
+      auth: `${baseUrl}/api/${apiVersion}/auth`,
+      wallet: `${baseUrl}/api/${apiVersion}/wallet`,
+      kyc: `${baseUrl}/api/${apiVersion}/kyc`,
     },
   })
 })

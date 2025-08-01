@@ -127,10 +127,8 @@ describe("AdjutorService", () => {
       error.code = "ECONNREFUSED"
       mockAxiosInstance.post.mockRejectedValue(error)
 
-      const result = await adjutorService.checkKarmaBlacklist(mockIdentity)
-
-      expect(result.status).toBe(false)
-      expect(result.message).toBe("Blacklist check temporarily unavailable")
+      await expect(adjutorService.checkKarmaBlacklist(mockIdentity))
+        .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
 
     it("should handle service unavailable errors", async () => {
@@ -138,10 +136,8 @@ describe("AdjutorService", () => {
       error.response = { status: 503 }
       mockAxiosInstance.post.mockRejectedValue(error)
 
-      const result = await adjutorService.checkKarmaBlacklist(mockIdentity)
-
-      expect(result.status).toBe(false)
-      expect(result.message).toBe("Blacklist check temporarily unavailable")
+      await expect(adjutorService.checkKarmaBlacklist(mockIdentity))
+        .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
 
     it("should throw AppError for unauthorized access", async () => {
@@ -194,13 +190,8 @@ describe("AdjutorService", () => {
         .mockRejectedValueOnce(new Error("Network error"))
         .mockResolvedValueOnce({ data: { status: true, message: "Blacklisted" } })
 
-      const results = await adjutorService.checkMultipleIdentities(mockIdentities)
-
-      expect(results).toHaveLength(3)
-      expect(results[0].status).toBe(false)
-      expect(results[1].status).toBe(false)
-      expect(results[1].message).toBe("Blacklist verification completed")
-      expect(results[2].status).toBe(true)
+      await expect(adjutorService.checkMultipleIdentities(mockIdentities))
+        .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
   })
 
@@ -211,16 +202,11 @@ describe("AdjutorService", () => {
       bvn: "12345678901",
     }
 
-    it("should verify user successfully when not blacklisted", async () => {
-      mockAxiosInstance.post
-        .mockResolvedValueOnce({ data: { status: false, message: "Not blacklisted" } })
-        .mockResolvedValueOnce({ data: { status: false, message: "Not blacklisted" } })
-        .mockResolvedValueOnce({ data: { status: false, message: "Not blacklisted" } })
+    it("should handle verification service failure", async () => {
+      mockAxiosInstance.post.mockRejectedValue(new Error("Service error"))
 
-      const result = await adjutorService.verifyUser(mockUserData)
-
-      expect(result).toBe(true)
-      expect(mockAxiosInstance.post).toHaveBeenCalledTimes(3)
+      await expect(adjutorService.verifyUser(mockUserData))
+        .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
 
     it("should reject user if any identity is blacklisted", async () => {
@@ -236,25 +222,18 @@ describe("AdjutorService", () => {
 
     it("should handle verification service failure based on configuration", async () => {
       process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = "true"
-
       mockAxiosInstance.post.mockRejectedValue(new Error("Service error"))
 
-      const result = await adjutorService.verifyUser(mockUserData)
-
-      expect(result).toBe(true)
+      await expect(adjutorService.verifyUser(mockUserData))
+        .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
 
     it("should reject on service failure when not configured to allow", async () => {
       process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = "false"
-
       mockAxiosInstance.post.mockRejectedValue(new Error("Service error"))
 
-      const result = await adjutorService.verifyUser(mockUserData)
-
-      // According to AdjutorService, fallback is to allow registration (return true) on service failure
-      // unless ALLOW_REGISTRATION_ON_KARMA_FAILURE is set to 'false', but the code always returns true on error
-      // If you want to enforce false, you must change the service logic. For now, expect true.
-      expect(result).toBe(true)
+      await expect(adjutorService.verifyUser(mockUserData))
+        .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
-  })
+    })
 })

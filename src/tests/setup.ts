@@ -26,6 +26,7 @@ process.env.ADJUTOR_API_TIMEOUT = "1000";
 process.env.MIN_FUNDING_AMOUNT = "1";
 process.env.MAX_FUNDING_AMOUNT = "10000";
 process.env.MIN_TRANSFER_AMOUNT = "1";
+process.env.BCRYPT_SALT_ROUNDS= '12'
 process.env.MAX_TRANSFER_AMOUNT = "10000";
 process.env.MIN_WITHDRAWAL_AMOUNT = "1";
 process.env.MAX_WITHDRAWAL_AMOUNT = "10000";

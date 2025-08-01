@@ -22,11 +22,12 @@ describe("Helpers", () => {
 
   describe("hashPassword", () => {
     it("should hash password successfully", async () => {
+      process.env.BCRYPT_SALT_ROUNDS = "12"; // This is fine here or in setup.ts
       const password = "Password123!"
       const hashedPassword = "hashed-password"
       mockedBcrypt.hash.mockResolvedValue(hashedPassword as never)
 
-      const result = await helpers.hashPassword(password)
+      const result = await helpers.hashPassword(password) // <-- add await
 
       expect(mockedBcrypt.hash).toHaveBeenCalledWith(password, 12)
       expect(result).toBe(hashedPassword)
