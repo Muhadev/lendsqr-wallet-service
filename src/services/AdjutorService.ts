@@ -128,31 +128,33 @@ export class AdjutorService {
    * @returns Promise<KarmaCheckResponse>
    */
   async checkKarmaBlacklist(identity: KarmaIdentity): Promise<KarmaCheckResponse> {
-    try {
-      logger.info("Starting Karma blacklist check", {
-        identity_type: identity.identity_type,
-        identity_number_masked: identity.identity_number.slice(-4),
-        endpoint: this.endpoint,
-        baseURL: this.baseURL,
-        requestPayload: identity
-      })
+  try {
+    const identityValue = encodeURIComponent(identity.identity_number)
+    const url = `${this.endpoint}/${identityValue}`
 
-      const response = await this.client.post(this.endpoint, identity)
+    logger.info("Calling Adjutor Karma API", {
+      url,
+      identity_type: identity.identity_type
+    })
 
-      logger.info("Karma blacklist check completed successfully", {
-        identity_type: identity.identity_type,
-        identity_number_masked: identity.identity_number.slice(-4),
-        is_blacklisted: response.data.status,
-        response_status: response.status,
-        full_response: response.data
-      })
+    // If identity_type is required as a query param
+    const response = await this.client.get(url, {
+      params: { identity_type: identity.identity_type }
+    })
 
-      return {
-        status: response.data.status || false,
-        message: response.data.message || "Check completed",
-        data: response.data.data,
-      }
-    } catch (error: any) {
+    logger.info("Karma blacklist check completed", {
+      is_blacklisted: response.data.status,
+      response_status: response.status,
+      full_response: response.data
+    })
+
+    return {
+      status: response.data.status || false,
+      message: response.data.message || "Check completed",
+      data: response.data.data,
+    }
+  }
+    catch (error: any) {
       logger.error("Karma blacklist check failed - Detailed Error", {
         identity_type: identity.identity_type,
         identity_number_masked: identity.identity_number.slice(-4),
@@ -167,71 +169,10 @@ export class AdjutorService {
         fullErrorObject: JSON.stringify(error, Object.getOwnPropertyNames(error))
       })
 
-      // Enhanced error handling with more specific messages
-      if (error.response) {
-        const statusCode = error.response.status
-        const errorData = error.response.data
-        
-        if (statusCode === 401) {
-          logger.error("Authentication failed with Adjutor API", {
-            apiKey: this.apiKey.substring(0, 8) + "...",
-            message: "Please verify your API key is correct and active"
-          })
-          throw new AppError("Invalid API key for Adjutor service. Please check your credentials.", 503)
-        } else if (statusCode === 403) {
-          throw new AppError("Access forbidden to Adjutor API. Your account may not have access to the Karma service.", 503)
-        } else if (statusCode === 404) {
-          throw new AppError(`Adjutor API endpoint not found: ${this.baseURL}${this.endpoint}`, 503)
-        } else if (statusCode === 422) {
-          throw new AppError(`Invalid request data sent to Adjutor API: ${errorData?.message || 'Validation failed'}`, 503)
-        } else if (statusCode === 429) {
-          throw new AppError("Rate limit exceeded for Adjutor API. Please try again later.", 503)
-        } else if (statusCode >= 500) {
-          throw new AppError(`Adjutor API server error (${statusCode}): ${errorData?.message || 'Service temporarily unavailable'}`, 503)
-        } else {
-          throw new AppError(`Adjutor API error (${statusCode}): ${errorData?.message || error.message}`, 503)
-        }
-      } else if (error.request) {
-        if (error.code === 'ECONNABORTED') {
-          throw new AppError(`Adjutor API request timed out after ${this.timeout}ms. The service may be slow or unavailable.`, 503)
-        } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-          throw new AppError(`Cannot connect to Adjutor API at ${this.baseURL}. Please check the URL is correct.`, 503)
-        } else {
-          throw new AppError(`Network error connecting to Adjutor API: ${error.message}`, 503)
-        }
-      } else {
-        throw new AppError(`Adjutor API request setup error: ${error.message}`, 503)
-      }
+      // Always throw the same error for any failure
+      throw new AppError("Unable to verify blacklist status. Registration denied.", 503)
     }
   }
-
-  /**
-   * Test API connectivity
-   */
-  async testConnection(): Promise<boolean> {
-    try {
-      // Test with a simple BVN check
-      const testIdentity: KarmaIdentity = {
-        identity_number: "12345678901", // Test BVN
-        identity_type: "BVN"
-      }
-      
-      logger.info("Testing Adjutor API connection", {
-        baseURL: this.baseURL,
-        endpoint: this.endpoint,
-        testIdentity
-      })
-      
-      await this.checkKarmaBlacklist(testIdentity)
-      return true
-    } catch (error: any) {
-      logger.error("Adjutor API connection test failed", {
-        error: error.message
-      })
-      return false
-    }
-  }
-
   /**
    * Check multiple identities against Karma blacklist
    * @param identities - Array of user identities
@@ -269,27 +210,11 @@ export class AdjutorService {
             identity_type: batch[index].identity_type,
             error: result.reason?.message,
           })
-          
-          // Check if we should allow registration on failure
-          const allowOnFailure = process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE === 'true'
-          
-          if (allowOnFailure) {
-            logger.warn("Proceeding despite Karma check failure", {
-              reason: "ALLOW_REGISTRATION_ON_KARMA_FAILURE is enabled",
-              identity_type: batch[index].identity_type
-            })
-            // Push a default "not blacklisted" result
-            results.push({
-              status: false,
-              message: "Check bypassed due to API failure"
-            })
-          } else {
-            throw new AppError("Unable to verify blacklist status. Registration denied.", 503)
-          }
+          // Always throw for any failure
+          throw new AppError("Unable to verify blacklist status. Registration denied.", 503)
         }
       })
     }
-
     return results
   }
 

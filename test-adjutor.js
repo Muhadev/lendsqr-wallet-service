@@ -1,65 +1,44 @@
-// test-api.js - Run this to test your API configuration
-// Run with: node test-api.js
+const axios = require('axios');
 
-const https = require('https');
+async function testAdjutorAPI() {
+  const baseURL = 'https://adjutor.lendsqr.com/v2';
+  const endpoint = '/verification/karma';
+  const testIdentities = [
+    { identity_number: "22334455667", identity_type: "BVN" },
+    { identity_number: "08028181984", identity_type: "PHONE_NUMBER" },
+    { identity_number: "muhammedfayemi123@gmail.com", identity_type: "EMAIL" }
+  ];
+  const apiKey = "api_key";
 
-const options = {
-  hostname: 'adjutor.lendsqr.com',
-  port: 443,
-  path: '/v2/verification/karma',
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer sk_live_KGsBUQN3xiWyBvFMRVsvdVqFVV2eA2Y6wv6CRwAE',
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    'User-Agent': 'Lendsqr-Wallet-Service-Test/1.0'
-  }
-};
-
-const testData = JSON.stringify({
-  identity_number: "22459517707", // Your test BVN
-  identity_type: "BVN"
-});
-
-console.log('Testing Adjutor API...');
-console.log('URL:', `https://${options.hostname}${options.path}`);
-console.log('Method:', options.method);
-console.log('Headers:', options.headers);
-console.log('Data:', testData);
-console.log('\n--- Response ---');
-
-const req = https.request(options, (res) => {
-  console.log('Status Code:', res.statusCode);
-  console.log('Status Message:', res.statusMessage);
-  console.log('Headers:', res.headers);
-  console.log('\nResponse Body:');
-  
-  let data = '';
-  
-  res.on('data', (chunk) => {
-    data += chunk;
-  });
-  
-  res.on('end', () => {
+  for (const identity of testIdentities) {
+    const url = `${baseURL}${endpoint}/${encodeURIComponent(identity.identity_number)}`;
     try {
-      const jsonData = JSON.parse(data);
-      console.log(JSON.stringify(jsonData, null, 2));
-    } catch (e) {
-      console.log('Raw response:', data);
+      console.log(`Testing: GET ${url}?identity_type=${identity.identity_type}`);
+      const response = await axios.get(url, {
+        params: { identity_type: identity.identity_type },
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json'
+        },
+        timeout: 10000
+      });
+      console.log(`✅ SUCCESS: ${url}`);
+      console.log(`Status: ${response.status}`);
+      console.log(`Response:`, response.data);
+      console.log('---\n');
+    } catch (error) {
+      console.log(`❌ FAILED: ${url}`);
+      if (error.response) {
+        console.log(`Status: ${error.response.status}`);
+        console.log(`Error:`, error.response.data);
+      } else if (error.request) {
+        console.log('No response received - connection issue');
+      } else {
+        console.log('Error:', error.message);
+      }
+      console.log('---\n');
     }
-  });
-});
+  }
+}
 
-req.on('error', (error) => {
-  console.error('Request Error:', error.message);
-  console.error('Error Code:', error.code);
-});
-
-req.on('timeout', () => {
-  console.error('Request timed out');
-  req.destroy();
-});
-
-req.setTimeout(10000); // 10 second timeout
-req.write(testData);
-req.end();
+testAdjutorAPI().catch(console.error);

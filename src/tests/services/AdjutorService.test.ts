@@ -19,16 +19,16 @@ describe("AdjutorService", () => {
   let mockAxiosInstance: any
 
   beforeEach(() => {
-    // Set required env vars for each test
     process.env.ADJUTOR_API_URL = "https://test-adjutor.com/v2"
     process.env.ADJUTOR_API_KEY = "test-api-key"
     process.env.ADJUTOR_API_TIMEOUT = "5000"
     process.env.KARMA_ENDPOINT = "/test"
     process.env.KARMA_MAX_CONCURRENT_REQUESTS = "3"
     process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = "false"
+    process.env.API_VERSION = "v1"
 
     mockAxiosInstance = {
-      post: jest.fn(),
+      get: jest.fn(),
       interceptors: {
         request: { use: jest.fn() },
         response: { use: jest.fn() },
@@ -67,10 +67,12 @@ describe("AdjutorService", () => {
           Authorization: "Bearer test-api-key",
           "Content-Type": "application/json",
           "User-Agent": expect.stringContaining("Lendsqr-Wallet-Service"),
+          "Accept": "application/json",
         },
       })
     })
   })
+
   describe("checkKarmaBlacklist", () => {
     const mockIdentity: KarmaIdentity = {
       identity_number: "12345678901",
@@ -86,11 +88,14 @@ describe("AdjutorService", () => {
         },
       }
 
-      mockAxiosInstance.post.mockResolvedValue(mockResponse)
+      mockAxiosInstance.get.mockResolvedValue(mockResponse)
 
       const result = await adjutorService.checkKarmaBlacklist(mockIdentity)
 
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith(process.env.KARMA_ENDPOINT, mockIdentity)
+      expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+        "/test/12345678901",
+        { params: { identity_type: "BVN" } }
+      )
       expect(result).toEqual({
         status: false,
         message: "User is not blacklisted",
@@ -113,7 +118,7 @@ describe("AdjutorService", () => {
         },
       }
 
-      mockAxiosInstance.post.mockResolvedValue(mockResponse)
+      mockAxiosInstance.get.mockResolvedValue(mockResponse)
 
       const result = await adjutorService.checkKarmaBlacklist(mockIdentity)
 
@@ -125,7 +130,7 @@ describe("AdjutorService", () => {
     it("should handle API connection errors gracefully", async () => {
       const error: CustomError = new Error("Connection refused")
       error.code = "ECONNREFUSED"
-      mockAxiosInstance.post.mockRejectedValue(error)
+      mockAxiosInstance.get.mockRejectedValue(error)
 
       await expect(adjutorService.checkKarmaBlacklist(mockIdentity))
         .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
@@ -134,7 +139,7 @@ describe("AdjutorService", () => {
     it("should handle service unavailable errors", async () => {
       const error: CustomError = new Error("Service unavailable")
       error.response = { status: 503 }
-      mockAxiosInstance.post.mockRejectedValue(error)
+      mockAxiosInstance.get.mockRejectedValue(error)
 
       await expect(adjutorService.checkKarmaBlacklist(mockIdentity))
         .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
@@ -143,7 +148,7 @@ describe("AdjutorService", () => {
     it("should throw AppError for unauthorized access", async () => {
       const error: CustomError = new Error("Unauthorized")
       error.response = { status: 401 }
-      mockAxiosInstance.post.mockRejectedValue(error)
+      mockAxiosInstance.get.mockRejectedValue(error)
 
       await expect(adjutorService.checkKarmaBlacklist(mockIdentity)).rejects.toThrow(AppError)
     })
@@ -151,7 +156,7 @@ describe("AdjutorService", () => {
     it("should throw AppError for rate limiting", async () => {
       const error: CustomError = new Error("Too many requests")
       error.response = { status: 429 }
-      mockAxiosInstance.post.mockRejectedValue(error)
+      mockAxiosInstance.get.mockRejectedValue(error)
 
       await expect(adjutorService.checkKarmaBlacklist(mockIdentity)).rejects.toThrow(AppError)
     })
@@ -171,7 +176,7 @@ describe("AdjutorService", () => {
         { data: { status: true, message: "Blacklisted" } },
       ]
 
-      mockAxiosInstance.post
+      mockAxiosInstance.get
         .mockResolvedValueOnce(mockResponses[0])
         .mockResolvedValueOnce(mockResponses[1])
         .mockResolvedValueOnce(mockResponses[2])
@@ -185,7 +190,7 @@ describe("AdjutorService", () => {
     })
 
     it("should handle partial failures gracefully", async () => {
-      mockAxiosInstance.post
+      mockAxiosInstance.get
         .mockResolvedValueOnce({ data: { status: false, message: "Not blacklisted" } })
         .mockRejectedValueOnce(new Error("Network error"))
         .mockResolvedValueOnce({ data: { status: true, message: "Blacklisted" } })
@@ -203,14 +208,14 @@ describe("AdjutorService", () => {
     }
 
     it("should handle verification service failure", async () => {
-      mockAxiosInstance.post.mockRejectedValue(new Error("Service error"))
+      mockAxiosInstance.get.mockRejectedValue(new Error("Service error"))
 
       await expect(adjutorService.verifyUser(mockUserData))
         .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
 
     it("should reject user if any identity is blacklisted", async () => {
-      mockAxiosInstance.post
+      mockAxiosInstance.get
         .mockResolvedValueOnce({ data: { status: false, message: "Not blacklisted" } })
         .mockResolvedValueOnce({ data: { status: true, message: "Blacklisted" } })
         .mockResolvedValueOnce({ data: { status: false, message: "Not blacklisted" } })
@@ -222,7 +227,7 @@ describe("AdjutorService", () => {
 
     it("should handle verification service failure based on configuration", async () => {
       process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = "true"
-      mockAxiosInstance.post.mockRejectedValue(new Error("Service error"))
+      mockAxiosInstance.get.mockRejectedValue(new Error("Service error"))
 
       await expect(adjutorService.verifyUser(mockUserData))
         .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
@@ -230,10 +235,10 @@ describe("AdjutorService", () => {
 
     it("should reject on service failure when not configured to allow", async () => {
       process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE = "false"
-      mockAxiosInstance.post.mockRejectedValue(new Error("Service error"))
+      mockAxiosInstance.get.mockRejectedValue(new Error("Service error"))
 
       await expect(adjutorService.verifyUser(mockUserData))
         .rejects.toThrow("Unable to verify blacklist status. Registration denied.")
     })
-    })
+  })
 })
