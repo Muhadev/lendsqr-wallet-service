@@ -44,6 +44,7 @@ export class AuthService {
    * @param userData - User registration data
    * @returns Promise<AuthResponse>
    */
+  // Add this method to your AuthService class
   async register(userData: CreateUserData): Promise<AuthResponse> {
     try {
       logger.info("Starting user registration process", { email: userData.email })
@@ -52,21 +53,40 @@ export class AuthService {
       await this.validateRegistrationData(userData)
       logger.debug("Registration data validation passed", { email: userData.email })
 
-      // Blacklist verification
-      const isVerified = await this.adjutorService.verifyUser({
-        email: userData.email,
-        phone: userData.phone,
-        bvn: userData.bvn,
-      })
+      // Blacklist verification with bypass option
+      try {
+        const isVerified = await this.adjutorService.verifyUser({
+          email: userData.email,
+          phone: userData.phone,
+          bvn: userData.bvn,
+        })
 
-      if (!isVerified) {
-        logger.warn("User failed blacklist verification", { email: userData.email })
-        throw new BlacklistError("User is blacklisted and cannot be onboarded")
+        if (!isVerified) {
+          logger.warn("User failed blacklist verification", { email: userData.email })
+          throw new BlacklistError("User is blacklisted and cannot be onboarded")
+        }
+        
+        logger.debug("Blacklist verification passed", { email: userData.email })
+      } catch (error: any) {
+        logger.error("Blacklist verification failed", {
+          email: userData.email,
+          error: error.message
+        })
+        
+        // Check if we should allow registration on Karma failure
+        const allowOnFailure = process.env.ALLOW_REGISTRATION_ON_KARMA_FAILURE === 'true'
+        
+        if (allowOnFailure) {
+          logger.warn("Proceeding with registration despite Karma verification failure", {
+            email: userData.email,
+            reason: "ALLOW_REGISTRATION_ON_KARMA_FAILURE is enabled"
+          })
+        } else {
+          throw error // Re-throw the original error
+        }
       }
 
-      logger.debug("Blacklist verification passed", { email: userData.email })
-
-      // Check for existing users
+      // Continue with the rest of your registration logic...
       await this.checkExistingUser(userData)
       logger.debug("Existing user check passed", { email: userData.email })
 
